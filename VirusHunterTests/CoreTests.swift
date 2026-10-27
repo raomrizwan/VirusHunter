@@ -59,6 +59,14 @@ final class CoreTests: XCTestCase {
         XCTAssertEqual(p.damage, 1.3, accuracy: 0.0001)
     }
 
+    func testFreshPlayerOutrunsRegularViruses() {
+        // No Tech Lab and no passives: Nano must still be clearly faster than any regular virus at max jitter.
+        let p = PlayerStats.make(save: SaveData(), loadout: Loadout())
+        for kind in [EnemyKind.spiky, .mini, .blob, .dart, .spitter, .elite] {
+            XCTAssertGreaterThan(p.speed, kind.base.speed * 1.12 * 1.75, "\(kind)")
+        }
+    }
+
     func testSpawnerUnlocksKindsOverTime() {
         XCTAssertFalse(Spawner.kinds(time: 10).contains { $0.0 == .blob })
         XCTAssertTrue(Spawner.kinds(time: 150).contains { $0.0 == .spitter })

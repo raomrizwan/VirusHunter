@@ -204,7 +204,7 @@ final class GameScene: SKScene {
         let maxR = 52.0
         if l > maxR { v = CGVector(dx: v.dx / l * maxR, dy: v.dy / l * maxR) }
         joyKnob.position = CGPoint(x: o.x + v.dx, y: o.y + v.dy)
-        let mag = min(1, l / 40)
+        let mag = min(1, l / 24) // full speed after a short drag
         moveDir = l < 4 ? .zero : CGVector(dx: v.dx / max(l, 1) * mag, dy: v.dy / max(l, 1) * mag)
     }
 
@@ -227,10 +227,15 @@ final class GameScene: SKScene {
         let rawDt = lastUpdate == 0 ? 1.0 / 60 : currentTime - lastUpdate
         lastUpdate = currentTime
         guard !simPaused, !over else { return }
-        let dt = min(rawDt, 1.0 / 30)
-        time += dt
-        step(dt)
-        hudTimer -= dt
+        // Sub-step long frames so a slow device runs at real speed instead of in slow motion.
+        var remaining = min(rawDt, 0.1)
+        while remaining > 0.0001, !simPaused, !over {
+            let dt = min(remaining, 1.0 / 30)
+            remaining -= dt
+            time += dt
+            step(dt)
+        }
+        hudTimer -= rawDt
         if hudTimer <= 0 { hudTimer = 0.1; pushHUD() }
     }
 
@@ -915,6 +920,7 @@ final class GameScene: SKScene {
     private func die() {
         hp = 0
         simPaused = true
+        endTouch()
         Sound.defeat.play()
         Haptics.error()
         player.texture = tex("nano-hurt")
@@ -924,6 +930,7 @@ final class GameScene: SKScene {
     }
 
     private func revive() {
+        guard !over, case .dead(canRevive: true) = state.phase else { return }
         state.revivesUsed += 1
         hp = stats.maxHP
         invuln = 2.5
@@ -963,7 +970,12 @@ final class GameScene: SKScene {
     }
 
     /// Called by the HUD when the player gives up after dying.
-    func giveUp() { finish(won: false) }
+    func giveUp() {
+        switch state.phase {
+        case .dead, .paused: finish(won: false)
+        default: break
+        }
+    }
 
     var result: (coins: Int, kills: Int, time: Double, level: Int) { (coinsCollected, kills, time, level) }
 

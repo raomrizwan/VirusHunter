@@ -66,6 +66,7 @@ struct GameContent: View {
 
     private func revive() {
         let st = holder.state
+        guard case .dead(canRevive: true) = st.phase else { return }
         if model.save.level(.revive) > 0 || !RewardedController.shared.isReady || AppModel.uiTesting {
             st.onRevive?()
         } else {
@@ -284,6 +285,8 @@ struct DeadView: View {
     var onRevive: () -> Void
     var onGiveUp: () -> Void
     @State private var count = 9
+    /// Set once Revive is tapped, so the countdown can't give up while the rewarded ad is on screen.
+    @State private var reviving = false
     var body: some View {
         ZStack {
             Color(red: 0.2, green: 0, blue: 0.05).opacity(0.75).ignoresSafeArea()
@@ -293,10 +296,15 @@ struct DeadView: View {
                 if canRevive {
                     Text("\(count)").font(Theme.title(56)).foregroundStyle(Theme.gold).contentTransition(.numericText())
                     GameButton(title: freeRevive ? "Revive (free)" : "Revive", icon: freeRevive ? "arrow.counterclockwise" : "play.rectangle.fill",
-                               colors: [Theme.gold, Color(red: 0.95, green: 0.5, blue: 0.1)], action: onRevive)
-                        .accessibilityIdentifier("reviveButton")
+                               colors: [Theme.gold, Color(red: 0.95, green: 0.5, blue: 0.1)]) {
+                        guard !reviving else { return }
+                        reviving = true
+                        onRevive()
+                    }
+                    .disabled(reviving)
+                    .accessibilityIdentifier("reviveButton")
                 }
-                Button("No thanks") { onGiveUp() }.font(Theme.body(17)).foregroundStyle(Theme.muted).padding(.top, 4)
+                Button("No thanks") { if !reviving { onGiveUp() } }.font(Theme.body(17)).foregroundStyle(Theme.muted).padding(.top, 4)
                     .accessibilityIdentifier("giveUpButton")
             }
             .padding(.horizontal, 30)
@@ -304,10 +312,12 @@ struct DeadView: View {
         .task {
             guard canRevive else { return }
             while count > 0 {
-                try? await Task.sleep(for: .seconds(1))
+                // A cancelled sleep throws: stop here instead of spinning to zero and giving up.
+                do { try await Task.sleep(for: .seconds(1)) } catch { return }
+                if reviving { return }
                 withAnimation { count -= 1 }
             }
-            onGiveUp()
+            if !reviving { onGiveUp() }
         }
     }
 }
