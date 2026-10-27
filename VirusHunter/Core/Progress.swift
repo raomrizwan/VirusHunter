@@ -56,6 +56,8 @@ struct SaveData: Codable, Equatable {
     var soundOn: Bool = true
     var hapticsOn: Bool = true
     var seenIntro: Bool = false
+    var ownedSkins: Set<String> = []
+    var skinID: String = Skin.classic.rawValue
 
     func level(_ t: TechKind) -> Int { tech[t.rawValue] ?? 0 }
 
@@ -70,6 +72,26 @@ struct SaveData: Codable, Equatable {
     }
 
     var endlessUnlocked: Bool { clearedStages.contains(2) }
+}
+
+extension SaveData {
+    /// Missing keys fall back to defaults, so saves from older versions keep their progress.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let d = SaveData()
+        coins = try c.decodeIfPresent(Int.self, forKey: .coins) ?? d.coins
+        unlockedStage = try c.decodeIfPresent(Int.self, forKey: .unlockedStage) ?? d.unlockedStage
+        clearedStages = try c.decodeIfPresent(Set<Int>.self, forKey: .clearedStages) ?? d.clearedStages
+        bestEndless = try c.decodeIfPresent(Double.self, forKey: .bestEndless) ?? d.bestEndless
+        tech = try c.decodeIfPresent([String: Int].self, forKey: .tech) ?? d.tech
+        runs = try c.decodeIfPresent(Int.self, forKey: .runs) ?? d.runs
+        totalKills = try c.decodeIfPresent(Int.self, forKey: .totalKills) ?? d.totalKills
+        soundOn = try c.decodeIfPresent(Bool.self, forKey: .soundOn) ?? d.soundOn
+        hapticsOn = try c.decodeIfPresent(Bool.self, forKey: .hapticsOn) ?? d.hapticsOn
+        seenIntro = try c.decodeIfPresent(Bool.self, forKey: .seenIntro) ?? d.seenIntro
+        ownedSkins = try c.decodeIfPresent(Set<String>.self, forKey: .ownedSkins) ?? d.ownedSkins
+        skinID = try c.decodeIfPresent(String.self, forKey: .skinID) ?? d.skinID
+    }
 }
 
 /// Player numbers for a run: Tech Lab + in-run passives.

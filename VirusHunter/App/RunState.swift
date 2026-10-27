@@ -24,6 +24,8 @@ final class RunState: ObservableObject {
     @Published var banner: String?
     @Published var loadout = Loadout()
     @Published var revivesUsed = 0
+    /// "Drag anywhere to fly" hint on the first run, hidden at the first touch.
+    @Published var moveHint = false
 
     /// Set by the scene; the HUD calls these.
     var onChoose: ((UpgradeOption) -> Void)?

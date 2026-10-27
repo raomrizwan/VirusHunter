@@ -34,6 +34,7 @@ struct GameContent: View {
     let holder: GameHolder
     @ObservedObject var state: RunState
     @State private var reward: (coins: Int, doubled: Bool)?
+    @State private var unlocks: [String] = []
     @State private var saved = false
 
     var body: some View {
@@ -42,9 +43,11 @@ struct GameContent: View {
             SpriteView(scene: holder.scene, preferredFramesPerSecond: 60, options: [.ignoresSiblingOrder])
                 .ignoresSafeArea()
             HUD(state: st, onPause: { holder.scene.pauseRun() })
+            if st.moveHint && st.phase == .playing { MoveHint().transition(.opacity) }
             overlay(st)
         }
         .statusBarHidden(true)
+        .animation(.easeOut(duration: 0.3), value: st.moveHint)
         .onChange(of: st.phase) { _, p in
             if case .finished(let won) = p { finish(won: won) }
             if holder.autoplay, case .levelUp(let opts, _) = p {
@@ -58,9 +61,10 @@ struct GameContent: View {
         case .playing: EmptyView()
         case .levelUp(let opts, let chest): LevelUpView(options: opts, fromChest: chest, loadout: st.loadout) { st.onChoose?($0) }
         case .paused: PauseView(state: st, onResume: { st.onResume?() }, onQuit: { holder.scene.giveUp() })
-        case .dead(let canRevive): DeadView(canRevive: canRevive, freeRevive: model.save.level(.revive) > 0 && st.revivesUsed == 0,
+        case .dead(let canRevive): DeadView(skin: model.save.skin, canRevive: canRevive, freeRevive: model.save.level(.revive) > 0 && st.revivesUsed == 0,
                                             onRevive: revive, onGiveUp: { holder.scene.giveUp() })
-        case .finished(let won): ResultView(organ: organ, won: won, state: st, reward: reward, onDouble: doubleCoins, onDone: leave, onNext: nextOrgan)
+        case .finished(let won): ResultView(organ: organ, won: won, state: st, reward: reward, save: model.save, unlocks: unlocks,
+                                            onDouble: doubleCoins, onDone: leave, onNext: nextOrgan)
         }
     }
 
@@ -81,6 +85,7 @@ struct GameContent: View {
         let stats = PlayerStats.make(save: model.save, loadout: Loadout())
         let coins = runCoins(collected: r.coins, kills: r.kills, cleared: won ? organ : nil, bonus: stats.coinBonus)
         var s = model.save
+        let before = s
         s.coins += coins
         s.runs += 1
         s.totalKills += r.kills
@@ -91,7 +96,17 @@ struct GameContent: View {
         if organ.isEndless { s.bestEndless = max(s.bestEndless, r.time) }
         model.save = s
         model.persist()
+        unlocks = newUnlocks(before: before, after: s)
         reward = (coins, false)
+    }
+
+    /// Lines like "Heart unlocked" for the result screen, so the player sees what this run opened up.
+    private func newUnlocks(before: SaveData, after: SaveData) -> [String] {
+        var out: [String] = []
+        if after.unlockedStage > before.unlockedStage { out.append("\(Organ.all[after.unlockedStage - 1].name) unlocked") }
+        if after.endlessUnlocked && !before.endlessUnlocked { out.append("Endless mode unlocked") }
+        for k in Skin.allCases where after.owns(k) && !before.owns(k) { out.append("\(k.title) unlocked") }
+        return out
     }
 
     private func doubleCoins() {
@@ -280,6 +295,7 @@ struct PauseView: View {
 }
 
 struct DeadView: View {
+    let skin: Skin
     let canRevive: Bool
     let freeRevive: Bool
     var onRevive: () -> Void
@@ -291,7 +307,7 @@ struct DeadView: View {
         ZStack {
             Color(red: 0.2, green: 0, blue: 0.05).opacity(0.75).ignoresSafeArea()
             VStack(spacing: 18) {
-                Image("nano-hurt").resizable().scaledToFit().frame(width: 150)
+                Image(skin.texture(.hurt)).resizable().scaledToFit().frame(width: 150)
                 Text("NANO IS DOWN!").font(Theme.title(36)).foregroundStyle(.white)
                 if canRevive {
                     Text("\(count)").font(Theme.title(56)).foregroundStyle(Theme.gold).contentTransition(.numericText())
@@ -327,6 +343,8 @@ struct ResultView: View {
     let won: Bool
     @ObservedObject var state: RunState
     let reward: (coins: Int, doubled: Bool)?
+    let save: SaveData
+    let unlocks: [String]
     var onDouble: () -> Void
     var onDone: () -> Void
     var onNext: () -> Void
@@ -336,7 +354,7 @@ struct ResultView: View {
         ZStack {
             Color.black.opacity(0.7).ignoresSafeArea()
             VStack(spacing: 16) {
-                Image(won ? "nano-joy" : "nano-hurt").resizable().scaledToFit().frame(width: 150)
+                Image(save.skin.texture(won ? .joy : .hurt)).resizable().scaledToFit().frame(width: unlocks.isEmpty ? 140 : 110)
                     .scaleEffect(appear ? 1 : 0.5).rotationEffect(.degrees(appear ? 0 : -20))
                 Text(won ? "\(organ.name.uppercased()) CLEARED!" : organ.isEndless ? "YOU SURVIVED" : "INFECTED!")
                     .font(Theme.title(32)).foregroundStyle(won ? Theme.lime : .white).multilineTextAlignment(.center)
@@ -356,6 +374,12 @@ struct ResultView: View {
                             .accessibilityIdentifier("doubleButton")
                     }
                 }
+                ForEach(unlocks, id: \.self) { u in
+                    Label(u, systemImage: "lock.open.fill").font(Theme.body(16, .heavy)).foregroundStyle(Theme.lime)
+                }
+                if let r = reward, let g = save.nextGoal {
+                    GoalCard(goal: g, coins: save.coins, earned: r.coins)
+                }
                 if won && !organ.isEndless && organ.id < 5 {
                     GameButton(title: "Next organ", icon: "arrow.right", action: onNext).accessibilityIdentifier("nextButton")
                 }
@@ -374,5 +398,68 @@ struct ResultView: View {
             Text(t).font(Theme.body(12)).foregroundStyle(Theme.muted)
         }
         .frame(maxWidth: .infinity).padding(.vertical, 12).glass(16)
+    }
+}
+
+// MARK: - First-run helpers
+
+/// Shown at the start of the first run until the player touches the screen.
+struct MoveHint: View {
+    @State private var swipe = false
+    var body: some View {
+        VStack(spacing: 10) {
+            Spacer()
+            Image(systemName: "hand.point.up.left.fill")
+                .font(.system(size: 44, weight: .bold)).foregroundStyle(.white)
+                .shadow(color: Theme.cyan.opacity(0.8), radius: 10)
+                .offset(x: swipe ? 50 : -50)
+            Text("Drag anywhere to fly").font(Theme.title(26)).foregroundStyle(.white)
+            Text("Nano shoots by itself").font(Theme.body(16)).foregroundStyle(Theme.muted)
+            Spacer().frame(height: 120)
+        }
+        .shadow(color: .black.opacity(0.6), radius: 4)
+        .allowsHitTesting(false)
+        .onAppear { withAnimation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true)) { swipe = true } }
+    }
+}
+
+/// "Next: Neon Nano 180 / 250" with a bar that fills from the old balance to the new one.
+struct GoalCard: View {
+    let goal: (title: String, image: String?, symbol: String?, cost: Int)
+    let coins: Int
+    let earned: Int
+    @State private var fill: Double = 0
+
+    var body: some View {
+        let ready = coins >= goal.cost
+        HStack(spacing: 12) {
+            Group {
+                if let img = goal.image { Image(img).resizable().scaledToFit() }
+                else if let sym = goal.symbol { Image(systemName: sym).font(.system(size: 24, weight: .bold)).foregroundStyle(Theme.cyan) }
+            }
+            .frame(width: 46, height: 46)
+            VStack(alignment: .leading, spacing: 5) {
+                Text(ready ? "READY TO UNLOCK" : "NEXT UNLOCK").font(Theme.body(11, .black)).foregroundStyle(ready ? Theme.lime : Theme.cyan).tracking(1.5)
+                Text(goal.title).font(Theme.body(16, .heavy)).foregroundStyle(.white)
+                GeometryReader { g in
+                    ZStack(alignment: .leading) {
+                        Capsule().fill(.black.opacity(0.45))
+                        Capsule().fill(LinearGradient(colors: [Theme.gold, Color(red: 0.95, green: 0.5, blue: 0.1)], startPoint: .leading, endPoint: .trailing))
+                            .frame(width: max(8, g.size.width * fill))
+                    }
+                }
+                .frame(height: 9)
+            }
+            HStack(spacing: 3) {
+                Image("coin").resizable().frame(width: 16, height: 16)
+                Text("\(min(coins, goal.cost))/\(goal.cost)").font(Theme.body(13, .heavy)).foregroundStyle(.white).monospacedDigit()
+            }
+        }
+        .padding(12).glass(16)
+        .onAppear {
+            let start = Double(max(0, coins - earned)) / Double(max(1, goal.cost))
+            fill = min(1, start)
+            withAnimation(.easeOut(duration: 1.2).delay(0.5)) { fill = min(1, Double(coins) / Double(max(1, goal.cost))) }
+        }
     }
 }

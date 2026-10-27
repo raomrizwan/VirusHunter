@@ -36,14 +36,32 @@ struct HomeView: View {
                 ZStack {
                     Circle().fill(RadialGradient(colors: [Theme.cyan.opacity(0.35), .clear], center: .center, startRadius: 10, endRadius: 170)).frame(width: 340, height: 340)
                     ForEach(0..<5) { i in
-                        Image("minibot").resizable().frame(width: 34, height: 34)
+                        Image(model.save.skin.botTexture).resizable().frame(width: 34, height: 34)
                             .offset(x: 120)
                             .rotationEffect(.degrees(Double(i) * 72 + (spin ? 360 : 0)))
                     }
-                    Image("nano-happy").resizable().scaledToFit().frame(width: 210)
-                        .offset(y: float ? -10 : 8)
+                    Button { model.go(.skins) } label: {
+                        Image(model.save.skin.texture(.happy)).resizable().scaledToFit().frame(width: 210)
+                    }
+                    .buttonStyle(PressStyle())
+                    .offset(y: float ? -10 : 8)
                 }
                 .frame(height: 300)
+                .frame(maxWidth: .infinity)
+                .overlay(alignment: .bottomTrailing) {
+                    Button { model.go(.skins) } label: {
+                        Label("Skins", systemImage: "paintpalette.fill").font(Theme.body(15, .heavy)).foregroundStyle(.white)
+                            .padding(.horizontal, 14).padding(.vertical, 10).glass(16)
+                            .overlay(alignment: .topTrailing) {
+                                if model.save.canAffordNewSkin {
+                                    Circle().fill(Theme.magenta).frame(width: 12, height: 12).offset(x: 3, y: -3)
+                                }
+                            }
+                    }
+                    .buttonStyle(PressStyle())
+                    .accessibilityIdentifier("skinsButton")
+                    .padding(.trailing, 20)
+                }
                 .onAppear {
                     withAnimation(.easeInOut(duration: 1.6).repeatForever(autoreverses: true)) { float = true }
                     withAnimation(.linear(duration: 9).repeatForever(autoreverses: false)) { spin = true }
@@ -112,36 +130,4 @@ struct FloatingViruses: View {
         .onAppear { t = true }
         .allowsHitTesting(false)
     }
-}
-
-struct IntroView: View {
-    @EnvironmentObject var model: AppModel
-    @State private var page = 0
-    private let pages: [(String, String, String)] = [
-        ("virus-spiky", "Year 2150", "A digital super-virus has infected the human body. Billions of viruses. One body at risk."),
-        ("nano-happy", "Meet Nano", "A tiny medical nanobot, built as humanity's last hope."),
-        ("nano-fight", "Survive the Swarm", "Drag to fly. Nano fires by itself. Collect DNA, level up, and build your own nano arsenal."),
-    ]
-    var body: some View {
-        ZStack {
-            MenuBackground(tint: page == 0 ? Theme.lime : Theme.cyan)
-            VStack(spacing: 24) {
-                HStack { Spacer(); Button("Skip") { done() }.font(Theme.body(16)).foregroundStyle(Theme.muted).padding() }
-                Spacer()
-                Image(pages[page].0).resizable().scaledToFit().frame(width: 230, height: 230)
-                    .shadow(color: (page == 0 ? Theme.lime : Theme.cyan).opacity(0.6), radius: 30)
-                    .id(page).transition(.scale.combined(with: .opacity))
-                Text(pages[page].1).font(Theme.title(34)).foregroundStyle(.white)
-                Text(pages[page].2).font(Theme.body(18, .medium)).foregroundStyle(Theme.muted).multilineTextAlignment(.center).padding(.horizontal, 36)
-                Spacer()
-                HStack(spacing: 8) { ForEach(0..<pages.count, id: \.self) { i in Capsule().fill(i == page ? Theme.cyan : .white.opacity(0.25)).frame(width: i == page ? 24 : 8, height: 8) } }
-                GameButton(title: page < pages.count - 1 ? "Next" : "Start", icon: page < pages.count - 1 ? "chevron.right" : "play.fill") {
-                    if page < pages.count - 1 { withAnimation(.spring) { page += 1 } } else { done() }
-                }
-                .padding(.horizontal, 28).padding(.bottom, 24)
-                .accessibilityIdentifier("introNext")
-            }
-        }
-    }
-    private func done() { model.save.seenIntro = true; model.persist(); model.go(.home) }
 }

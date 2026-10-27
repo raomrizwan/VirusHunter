@@ -77,6 +77,40 @@ def minibot(size=128):
     return wrap(body, size, size, defs)
 
 
+# ---------------------------------------------------------------- Nano skins
+# Each skin recolours the classic Nano / minibot SVG by swapping its palette.
+SKINS = {
+    "neon": {"#FFFFFF": "#FFE6F7", "#E7EEF7": "#FF9BDD", "#9FB0C8": "#B8378F", "#8FA2BD": "#8E2C73", "#C8D4E4": "#FFB8E8",
+             "#3FE6FF": "#FF5FD8", "#2DD4FF": "#FF5FD8", "#C9FFFF": "#FFD6F5", "#0AA8D8": "#C2189A", "#7CF6FF": "#FF9BE6", "#2D8CFF": "#B01FFF",
+             "#FF4D6D": "#3FE6FF", "#9FD9F0": "#FF9BDD", "#5FB6D8": "#B8378F", "#5FF2FF": "#FF7BE0"},
+    "toxic": {"#FFFFFF": "#F4FFE4", "#E7EEF7": "#A8F06E", "#9FB0C8": "#4E9A2E", "#8FA2BD": "#3E7A24", "#C8D4E4": "#CFF7A8",
+              "#3FE6FF": "#C6FF3D", "#2DD4FF": "#9BEA2A", "#C9FFFF": "#F2FFB8", "#0AA8D8": "#6DB816", "#7CF6FF": "#D9FF6B", "#2D8CFF": "#5CD62A",
+              "#FF4D6D": "#FFB020", "#9FD9F0": "#A8F06E", "#5FB6D8": "#4E9A2E", "#5FF2FF": "#D9FF6B"},
+    "stealth": {"#FFFFFF": "#6B7386", "#E7EEF7": "#353C4D", "#9FB0C8": "#161A24", "#8FA2BD": "#0B0D13", "#C8D4E4": "#4A5163",
+                "#1B2A4A": "#140A0D", "#0A1022": "#050203",
+                "#3FE6FF": "#FF3B4E", "#2DD4FF": "#FF3B4E", "#C9FFFF": "#FFC2C8", "#0AA8D8": "#B3121F", "#7CF6FF": "#FF7A85", "#2D8CFF": "#FF2A3A",
+                "#FF4D6D": "#FF3B4E", "#9FD9F0": "#353C4D", "#5FB6D8": "#0B0D13", "#5FF2FF": "#FF5A68", "#0E1B33": "#050203"},
+    "gold": {"#FFFFFF": "#FFF8D6", "#E7EEF7": "#FFD34D", "#9FB0C8": "#B07A06", "#8FA2BD": "#8A5E05", "#C8D4E4": "#FFE48A",
+             "#3FE6FF": "#FFE45C", "#2DD4FF": "#FFC21F", "#2D8CFF": "#FF9A1F",
+             "#9FD9F0": "#FFD34D", "#5FB6D8": "#B07A06"},
+}
+
+
+def reskin(svg, skin):
+    for old, new in SKINS[skin].items():
+        svg = svg.replace(old, new)
+    return svg
+
+
+def skin_items():
+    items = []
+    for k in SKINS:
+        for e in ["happy", "fight", "joy", "hurt"]:
+            items.append((f"nano-{k}-{e}", reskin(nano(e, 512), k)))
+        items.append((f"minibot-{k}", reskin(minibot(), k)))
+    return items
+
+
 # ---------------------------------------------------------------- viruses
 def virus(kind, size=256, seed=1):
     rnd = random.Random(seed)
@@ -294,7 +328,7 @@ def icon(size=1024):
 
 async def render(items):
     async with async_playwright() as p:
-        b = await p.chromium.launch()
+        b = await p.chromium.launch(executable_path=os.environ.get("CHROMIUM") or None)
         pg = await b.new_page(device_scale_factor=1)
         for name, svg in items:
             w = int(svg.split('width="')[1].split('"')[0]); h = int(svg.split('height="')[1].split('"')[0])
@@ -317,6 +351,7 @@ if __name__ == "__main__":
     for e in ["happy", "fight", "joy", "hurt"]:
         items.append((f"nano-{e}", nano(e, 512)))
     items.append(("minibot", minibot()))
+    items += skin_items()
     for k in ["spiky", "blob", "dart", "spitter", "mini", "elite"]:
         items.append((f"virus-{k}", virus(k, 256, seed=hash(k) % 100)))
     for k in ["sumo", "cowboy", "royal"]:
