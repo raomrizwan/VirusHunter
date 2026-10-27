@@ -22,6 +22,9 @@ final class Enemy {
     var shieldHitCD: Double = 0
     var fieldHitCD: Double = 0
     var alive = true
+    /// Idle wiggle, animated in `render()` rather than with per-node SKActions (hundreds of those add up).
+    var wobblePhase = 0.0
+    var wobbleAngle: CGFloat = 0
     var isElite: Bool { kind == .elite }
 
     init(kind: EnemyKind, node: SKSpriteNode, pos: CGPoint, hp: Double, speed: Double, radius: Double, damage: Double, xp: Int) {
@@ -157,7 +160,7 @@ final class GameScene: SKScene {
 
         fieldNode.strokeColor = UIColor(red: 0.45, green: 0.95, blue: 1, alpha: 0.55)
         fieldNode.fillColor = UIColor(red: 0.25, green: 0.85, blue: 1, alpha: 0.10)
-        fieldNode.lineWidth = 3; fieldNode.glowWidth = 6; fieldNode.isHidden = true; fieldNode.zPosition = 3
+        fieldNode.lineWidth = 4; fieldNode.blendMode = .add; fieldNode.isHidden = true; fieldNode.zPosition = 3
         world.addChild(fieldNode)
 
         playerShadow.fillColor = UIColor(white: 0, alpha: 0.35); playerShadow.strokeColor = .clear; playerShadow.zPosition = 4.5
@@ -197,15 +200,21 @@ final class GameScene: SKScene {
     }
 
     override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) {
-        guard let t = touches.first, let o = joyOrigin else { return }
+        guard let t = touches.first, var o = joyOrigin else { return }
         let p = t.location(in: cam)
         var v = sub(p, o)
-        let l = len(v)
+        var l = len(v)
         let maxR = 52.0
-        if l > maxR { v = CGVector(dx: v.dx / l * maxR, dy: v.dy / l * maxR) }
-        joyKnob.position = CGPoint(x: o.x + v.dx, y: o.y + v.dy)
+        if l > maxR {
+            // Drag the base along behind the thumb, so leaving the circle keeps full speed in the thumb's direction.
+            let k = (l - maxR) / l
+            o = CGPoint(x: o.x + v.dx * k, y: o.y + v.dy * k)
+            joyOrigin = o; joyBase.position = o
+            v = sub(p, o); l = maxR
+        }
+        joyKnob.position = p
         let mag = min(1, l / 24) // full speed after a short drag
-        moveDir = l < 4 ? .zero : CGVector(dx: v.dx / max(l, 1) * mag, dy: v.dy / max(l, 1) * mag)
+        moveDir = l < 4 ? .zero : CGVector(dx: v.dx / l * mag, dy: v.dy / l * mag)
     }
 
     override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) { endTouch() }
@@ -228,13 +237,15 @@ final class GameScene: SKScene {
         lastUpdate = currentTime
         guard !simPaused, !over else { return }
         // Sub-step long frames so a slow device runs at real speed instead of in slow motion.
-        var remaining = min(rawDt, 0.1)
+        // Capped at two steps so a heavy frame can't snowball into ever heavier ones.
+        var remaining = min(rawDt, 1.0 / 15)
         while remaining > 0.0001, !simPaused, !over {
             let dt = min(remaining, 1.0 / 30)
             remaining -= dt
             time += dt
             step(dt)
         }
+        render()
         hudTimer -= rawDt
         if hudTimer <= 0 { hudTimer = 0.1; pushHUD() }
     }
@@ -259,7 +270,6 @@ final class GameScene: SKScene {
         updatePickups(dt)
         contactDamage()
         compact()
-        render()
     }
 
     // MARK: spawning
@@ -312,13 +322,8 @@ final class GameScene: SKScene {
         let e = Enemy(kind: kind, node: node, pos: p, hp: b.hp * hpScale, speed: b.speed * speedJitter, radius: b.radius,
                       damage: b.damage * (0.85 + 0.15 * diff), xp: b.xp)
         e.timerA = Double.random(in: 1.5...3)
-        if kind != .mini && !kind.isBoss {
-            node.run(.repeatForever(.sequence([.scale(to: 1.06, duration: 0.45), .scale(to: 0.96, duration: 0.45)])))
-        }
-        if kind == .dart { node.run(.repeatForever(.rotate(byAngle: 2.4, duration: 1))) } else {
-            let w = CGFloat.random(in: 0.08...0.16)
-            node.run(.repeatForever(.sequence([.rotate(toAngle: w, duration: 0.6), .rotate(toAngle: -w, duration: 0.6)])))
-        }
+        e.wobblePhase = Double.random(in: 0..<(2 * .pi))
+        e.wobbleAngle = kind == .dart ? 0 : CGFloat.random(in: 0.08...0.16)
         enemies.append(e)
         return e
     }
@@ -329,7 +334,6 @@ final class GameScene: SKScene {
         let a = Double.random(in: 0..<(2 * .pi))
         let p = bossNear ? CGPoint(x: ppos.x, y: ppos.y + 175) : CGPoint(x: ppos.x + cos(a) * 320, y: ppos.y + sin(a) * 320)
         let e = spawn(kind, at: p)
-        e.node.removeAllActions()
         e.node.run(.repeatForever(.sequence([.scale(to: 1.04, duration: 0.6), .scale(to: 0.97, duration: 0.6)])))
         e.timerA = 3; e.timerB = 5
         boss = e
@@ -644,7 +648,7 @@ final class GameScene: SKScene {
             }
         }
         let s = SKShapeNode(path: path)
-        s.strokeColor = UIColor(red: 0.75, green: 0.95, blue: 1, alpha: 1); s.lineWidth = 3; s.glowWidth = 5
+        s.strokeColor = UIColor(red: 0.75, green: 0.95, blue: 1, alpha: 1); s.lineWidth = 4; s.blendMode = .add
         fxLayer.addChild(s)
         s.run(.sequence([.fadeOut(withDuration: 0.18), .removeFromParent()]))
     }
@@ -707,7 +711,7 @@ final class GameScene: SKScene {
         g.blendMode = .add
         fxLayer.addChild(g)
         g.run(.sequence([.group([.scale(to: 1, duration: 0.22), .fadeOut(withDuration: 0.35)]), .removeFromParent()]))
-        let ring = SKShapeNode(circleOfRadius: CGFloat(radius)); ring.position = p; ring.strokeColor = color; ring.lineWidth = 4; ring.glowWidth = 4; ring.setScale(0.4)
+        let ring = SKShapeNode(circleOfRadius: CGFloat(radius)); ring.position = p; ring.strokeColor = color; ring.lineWidth = 6; ring.blendMode = .add; ring.setScale(0.4)
         fxLayer.addChild(ring)
         ring.run(.sequence([.group([.scale(to: 1, duration: 0.25), .fadeOut(withDuration: 0.3)]), .removeFromParent()]))
     }
@@ -768,7 +772,10 @@ final class GameScene: SKScene {
         case .mini: color = UIColor(red: 1, green: 0.35, blue: 0.5, alpha: 1)
         case .elite, .bossRoyal: color = UIColor(red: 0.4, green: 0.9, blue: 1, alpha: 1)
         }
-        let count = kind.isBoss ? 18 : 5
+        // Skip sparks when the screen is already busy; a mass of kills would otherwise add hundreds of nodes.
+        let busy = fxLayer.children.count > 140
+        if busy && !kind.isBoss { return }
+        let count = kind.isBoss ? 18 : 3
         for _ in 0..<count {
             let g = SKSpriteNode(texture: tex("glow")); g.color = color; g.colorBlendFactor = 1; g.blendMode = .add
             let s = CGFloat.random(in: 10...22) * (kind.isBoss ? 2.5 : 1)
@@ -991,7 +998,16 @@ final class GameScene: SKScene {
         hpBar.position = CGPoint(x: ppos.x, y: ppos.y - 38)
         hpFill.size.width = 44 * CGFloat(max(0, hp / stats.maxHP))
         hpFill.color = hp / stats.maxHP < 0.3 ? UIColor(red: 1, green: 0.3, blue: 0.35, alpha: 1) : UIColor(red: 0.3, green: 0.95, blue: 0.55, alpha: 1)
-        for e in enemies where e.alive { e.node.position = e.pos }
+        for e in enemies where e.alive {
+            e.node.position = e.pos
+            let ph = time + e.wobblePhase
+            if e.kind == .dart {
+                e.node.zRotation = CGFloat(ph * 2.4) // dash pop scale stays an action
+            } else if !e.kind.isBoss {
+                e.node.zRotation = e.wobbleAngle * CGFloat(sin(ph * .pi / 1.2))
+                if e.kind != .mini { e.node.setScale(CGFloat(1.01 + 0.05 * sin(ph * .pi / 0.9))) }
+            }
+        }
         var cp = ppos
         if shake > 0 {
             shake -= 1.0 / 60
