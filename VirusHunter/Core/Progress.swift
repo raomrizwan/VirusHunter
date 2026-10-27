@@ -83,11 +83,14 @@ struct PlayerStats: Equatable {
     var regen: Double    // hp / s
     var coinBonus: Double
 
+    /// Points per second with no upgrades. Must comfortably outrun regular viruses from the first second.
+    static let baseSpeed: Double = 210
+
     static func make(save: SaveData, loadout: Loadout) -> PlayerStats {
         let p = loadout.passives
         return PlayerStats(
             maxHP: 100 + Double(save.level(.health) * 10) + Double((p[.maxHP] ?? 0) * 20),
-            speed: 150 * (1 + 0.03 * Double(save.level(.speed)) + 0.08 * Double(p[.speed] ?? 0)),
+            speed: PlayerStats.baseSpeed * (1 + 0.03 * Double(save.level(.speed)) + 0.08 * Double(p[.speed] ?? 0)),
             magnet: 120 * (1 + 0.08 * Double(save.level(.magnet)) + 0.30 * Double(p[.magnet] ?? 0)),
             damage: 1 + 0.05 * Double(save.level(.power)) + 0.10 * Double(p[.power] ?? 0),
             cooldown: max(0.5, 1 - 0.08 * Double(p[.rapid] ?? 0)),

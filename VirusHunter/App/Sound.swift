@@ -7,6 +7,7 @@ enum Sound: String, CaseIterable {
 
     static var enabled: Bool { UserDefaults.standard.object(forKey: "sound") as? Bool ?? true }
 
+    /// Only touched on `queue`.
     private static var pools: [Sound: [AVAudioPlayer]] = [:]
     private static var configured = false
 
@@ -28,7 +29,7 @@ enum Sound: String, CaseIterable {
                 }
                 loaded[s] = pool
             }
-            DispatchQueue.main.async { pools = loaded }
+            pools = loaded
         }
     }
 
@@ -41,10 +42,13 @@ enum Sound: String, CaseIterable {
         if minGap > 0, let last = Sound.lastPlayed[self], now - last < minGap { return }
         Sound.lastPlayed[self] = now
         Sound.preload()
-        guard let pool = Sound.pools[self] else { return }
-        let p = pool.first { !$0.isPlaying } ?? pool.first
-        p?.volume = volume
-        p?.currentTime = 0
-        p?.play()
+        // AVAudioPlayer.play() can take milliseconds; keep it off the game loop.
+        Sound.queue.async {
+            guard let pool = Sound.pools[self] else { return }
+            let p = pool.first { !$0.isPlaying } ?? pool.first
+            p?.volume = volume
+            p?.currentTime = 0
+            p?.play()
+        }
     }
 }
