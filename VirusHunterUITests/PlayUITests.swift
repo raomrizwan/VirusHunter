@@ -10,21 +10,29 @@ final class PlayUITests: XCTestCase {
         let att = XCTAttachment(screenshot: app.screenshot()); att.name = name; att.lifetime = .keepAlways; add(att)
     }
 
-    /// Menus: intro → home → map → lab.
-    func testMenus() {
+    /// A brand-new player lands straight in a Lungs run with the move hint.
+    func testFirstLaunchStartsARun() {
         let app = XCUIApplication()
         app.launchArguments = ["-uitesting", "-resetProgress"]
         app.launch()
-        XCTAssertTrue(app.buttons["introNext"].waitForExistence(timeout: 10))
-        save(app, "m01-intro1")
-        app.buttons["introNext"].tap(); sleep(1); save(app, "m02-intro2")
-        app.buttons["introNext"].tap(); sleep(1); save(app, "m03-intro3")
-        app.buttons["introNext"].tap()
-        XCTAssertTrue(app.buttons["playButton"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["pauseButton"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["Drag anywhere to fly"].exists)
+        sleep(1); save(app, "m01-first-run")
+    }
+
+    /// Menus: home → map → lab → skins.
+    func testMenus() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-uitesting", "-resetProgress", "-skipIntro", "-demoProgress"]
+        app.launch()
+        XCTAssertTrue(app.buttons["playButton"].waitForExistence(timeout: 10))
         sleep(1); save(app, "m04-home")
         app.buttons["playButton"].tap(); sleep(1); save(app, "m05-map")
         app.buttons["backButton"].tap(); sleep(1)
         app.buttons["labButton"].tap(); sleep(1); save(app, "m06-lab")
+        app.buttons["backButton"].tap(); sleep(1)
+        app.buttons["skinsButton"].tap(); sleep(1)
+        app.buttons["skin-neon"].tap(); sleep(1); save(app, "m07-skins")
     }
 
     /// A real run with the autopilot: plays, levels up (auto-choose), screenshots along the way.

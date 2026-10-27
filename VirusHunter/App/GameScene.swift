@@ -70,7 +70,8 @@ final class GameScene: SKScene {
     private let enemyLayer = SKNode(), fxLayer = SKNode(), pickupLayer = SKNode(), shotLayer = SKNode()
 
     // player
-    private let player = SKSpriteNode(imageNamed: "nano-fight")
+    private let player = SKSpriteNode()
+    private let skin: Skin
     private let playerShadow = SKShapeNode(ellipseOf: CGSize(width: 44, height: 12))
     private let hpBar = SKShapeNode(rectOf: CGSize(width: 46, height: 6), cornerRadius: 3)
     private let hpFill = SKSpriteNode(color: UIColor(red: 0.3, green: 0.95, blue: 0.55, alpha: 1), size: CGSize(width: 44, height: 4))
@@ -118,6 +119,9 @@ final class GameScene: SKScene {
     private var shake: Double = 0
     private var hudTimer: Double = 0
     private var textures: [String: SKTexture] = [:]
+    /// First run ever: faster early levels, a damage boost and Nano Swarm offered first (see `Rookie`).
+    private let rookie: Bool
+    private var swarmFeatured = false
     private var labelPool: [SKLabelNode] = []
 
     init(size: CGSize, state: RunState, save: SaveData, autoplay: Bool = false, god: Bool = false) {
@@ -125,7 +129,12 @@ final class GameScene: SKScene {
         self.save = save
         self.autoplay = autoplay
         self.god = god
-        self.stats = PlayerStats.make(save: save, loadout: state.loadout)
+        self.skin = save.skin
+        let rookie = save.runs == 0 && !state.organ.isEndless
+        self.rookie = rookie
+        var stats = PlayerStats.make(save: save, loadout: state.loadout)
+        if rookie { stats.damage *= Rookie.damageBoost }
+        self.stats = stats
         self.nextBoss = state.organ.bossTime
         super.init(size: size)
         hp = stats.maxHP
@@ -162,6 +171,7 @@ final class GameScene: SKScene {
 
         playerShadow.fillColor = UIColor(white: 0, alpha: 0.35); playerShadow.strokeColor = .clear; playerShadow.zPosition = 4.5
         world.addChild(playerShadow)
+        player.texture = tex(skin.texture(.fight))
         player.size = CGSize(width: 58, height: 58); player.zPosition = 5
         world.addChild(player)
         hpBar.fillColor = UIColor(white: 0, alpha: 0.55); hpBar.strokeColor = .clear; hpBar.zPosition = 5.5
@@ -183,6 +193,7 @@ final class GameScene: SKScene {
         rebuildWeapons()
         // A few starting viruses so the screen is never empty.
         for _ in 0..<6 { spawn(.spiky) }
+        state.moveHint = rookie && !autoplay
         pushHUD()
     }
 
@@ -191,6 +202,7 @@ final class GameScene: SKScene {
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
         guard let t = touches.first else { return }
         let p = t.location(in: cam)
+        state.moveHint = false
         joyOrigin = p
         joyBase.position = p; joyKnob.position = p
         joyBase.run(.fadeAlpha(to: 1, duration: 0.1)); joyKnob.run(.fadeAlpha(to: 1, duration: 0.1))
@@ -488,11 +500,12 @@ final class GameScene: SKScene {
 
     private func rebuildWeapons() {
         stats = PlayerStats.make(save: save, loadout: state.loadout)
+        if rookie { stats.damage *= Rookie.damageBoost }
         let lo = state.loadout
         // swarm bots
         let want = lo.level(.swarm) > 0 ? WeaponStats.swarm(lo.level(.swarm)).bots : 0
         while bots.count < want {
-            let n = SKSpriteNode(texture: tex("minibot")); n.size = CGSize(width: 26, height: 26); n.zPosition = 5
+            let n = SKSpriteNode(texture: tex(skin.botTexture)); n.size = CGSize(width: 26, height: 26); n.zPosition = 5
             world.addChild(n)
             bots.append(Bot(node: n, angle: Double(bots.count)))
         }
@@ -795,8 +808,8 @@ final class GameScene: SKScene {
         invuln = 0.6
         if !god { hp -= amount * (1 - stats.armor) }
         player.run(.sequence([.colorize(with: .red, colorBlendFactor: 0.8, duration: 0.05), .colorize(withColorBlendFactor: 0, duration: 0.25)]))
-        player.texture = tex("nano-hurt")
-        player.run(.sequence([.wait(forDuration: 0.4), .setTexture(tex("nano-fight"))]))
+        player.texture = tex(skin.texture(.hurt))
+        player.run(.sequence([.wait(forDuration: 0.4), .setTexture(tex(skin.texture(.fight)))]))
         shake = max(shake, 0.18)
         Sound.hurt.play(volume: 0.6, minGap: 0.2)
         Haptics.light()
@@ -862,7 +875,7 @@ final class GameScene: SKScene {
         case .xp(let v):
             xp += v
             Sound.pickup.play(volume: 0.3, minGap: 0.045)
-            while xp >= xpToNext(level) { xp -= xpToNext(level); level += 1; pendingLevels += 1 }
+            while xp >= xpNeeded(level) { xp -= xpNeeded(level); level += 1; pendingLevels += 1 }
             if pendingLevels > 0 { showLevelUp(fromChest: false) }
         case .coin(let n):
             coinsCollected += n; Sound.coin.play(volume: 0.5, minGap: 0.05)
@@ -882,11 +895,14 @@ final class GameScene: SKScene {
         l.run(.sequence([.group([.moveBy(x: 0, y: 30, duration: 0.7), .fadeOut(withDuration: 0.7)]), .removeFromParent()]))
     }
 
+    private func xpNeeded(_ level: Int) -> Int { rookie ? Rookie.xpNeeded(level) : xpToNext(level) }
+
     private func showLevelUp(fromChest: Bool) {
         guard !simPaused, !over else { return }
         simPaused = true
         endTouch()
-        let opts = state.loadout.rollOptions(rng: &rng)
+        var opts = state.loadout.rollOptions(rng: &rng)
+        if rookie && !swarmFeatured { opts = Rookie.featureSwarm(opts, loadout: state.loadout); swarmFeatured = true }
         Sound.levelup.play()
         Haptics.medium()
         pushHUD()
@@ -917,7 +933,7 @@ final class GameScene: SKScene {
         simPaused = true
         Sound.defeat.play()
         Haptics.error()
-        player.texture = tex("nano-hurt")
+        player.texture = tex(skin.texture(.hurt))
         let canRevive = state.revivesUsed == 0
         pushHUD()
         state.phase = .dead(canRevive: canRevive)
@@ -927,7 +943,7 @@ final class GameScene: SKScene {
         state.revivesUsed += 1
         hp = stats.maxHP
         invuln = 2.5
-        player.texture = tex("nano-fight")
+        player.texture = tex(skin.texture(.fight))
         player.run(.repeat(.sequence([.fadeAlpha(to: 0.3, duration: 0.12), .fadeAlpha(to: 1, duration: 0.12)]), count: 9))
         // Clear the area around the player.
         each(near: ppos, radius: 260) { e in if !e.kind.isBoss { self.kill(e) } }
@@ -951,7 +967,7 @@ final class GameScene: SKScene {
     private func finish(won: Bool) {
         guard !over else { return }
         over = true
-        if won { Sound.victory.play(); player.texture = tex("nano-joy") }
+        if won { Sound.victory.play(); player.texture = tex(skin.texture(.joy)) }
         pushHUD()
         state.phase = .finished(won: won)
     }
@@ -998,7 +1014,7 @@ final class GameScene: SKScene {
     private func pushHUD() {
         state.time = time
         state.level = level
-        state.xpFraction = Double(xp) / Double(xpToNext(level))
+        state.xpFraction = Double(xp) / Double(xpNeeded(level))
         state.hpFraction = max(0, hp / stats.maxHP)
         state.kills = kills
         state.coins = coinsCollected

@@ -13,7 +13,7 @@ struct VirusHunterApp: App {
 /// App-wide state: saved progress and which screen is showing.
 @MainActor
 final class AppModel: ObservableObject {
-    enum Screen: Equatable { case intro, home, map, lab, game(Organ) }
+    enum Screen: Equatable { case home, map, lab, skins, game(Organ) }
 
     @Published var save: SaveData
     @Published var screen: Screen
@@ -29,12 +29,17 @@ final class AppModel: ObservableObject {
             s.tech = ["power": 4, "health": 3, "speed": 2, "magnet": 3]
         }
         if AppModel.args.contains("-skipIntro") { s.seenIntro = true }
-        var first: Screen = s.seenIntro ? .home : .intro
+        // A brand-new player goes straight into the Lungs: menus come after they've had a taste of the game.
+        let fresh = !s.seenIntro
+        var first: Screen = fresh ? .game(Organ.all[0]) : .home
+        s.seenIntro = true
         if let i = AppModel.args.firstIndex(of: "-startStage"), i + 1 < AppModel.args.count, let n = Int(AppModel.args[i + 1]) {
             first = .game(n == 0 ? .endless : Organ.all[max(0, min(4, n - 1))])
         }
         save = s
         screen = first
+        if fresh { persist() } // the run reads the save from disk
+
     }
 
     func persist() { SaveStore.shared.save(save) }
@@ -47,10 +52,10 @@ struct RootView: View {
     var body: some View {
         ZStack {
             switch model.screen {
-            case .intro: IntroView().transition(.opacity)
             case .home: HomeView().transition(.opacity)
             case .map: MapView().transition(.move(edge: .trailing))
             case .lab: LabView().transition(.move(edge: .trailing))
+            case .skins: SkinsView().transition(.move(edge: .trailing))
             case .game(let organ): GameView(organ: organ).transition(.opacity).id(organ.id)
             }
         }

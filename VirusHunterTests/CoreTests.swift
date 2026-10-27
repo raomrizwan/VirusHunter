@@ -79,4 +79,46 @@ final class CoreTests: XCTestCase {
         store.save(s)
         XCTAssertEqual(store.load(), s)
     }
+
+    func testOldSaveWithoutSkinsStillLoads() {
+        let json = #"{"coins":321,"unlockedStage":2,"clearedStages":[1],"bestEndless":0,"tech":{"power":2},"runs":4,"totalKills":900,"soundOn":true,"hapticsOn":true,"seenIntro":true}"#
+        let s = try! JSONDecoder().decode(SaveData.self, from: Data(json.utf8))
+        XCTAssertEqual(s.coins, 321)
+        XCTAssertEqual(s.level(.power), 2)
+        XCTAssertEqual(s.skin, .classic)
+        XCTAssertTrue(s.ownedSkins.isEmpty)
+    }
+
+    func testSkinsBuyEquipAndEarn() {
+        var s = SaveData(); s.coins = 300
+        XCTAssertTrue(s.owns(.classic))
+        XCTAssertFalse(s.buy(.stealth))
+        XCTAssertTrue(s.buy(.neon))
+        XCTAssertEqual(s.coins, 50)
+        s.equip(.neon)
+        XCTAssertEqual(s.skin, .neon)
+        XCTAssertFalse(s.buy(.gold))
+        s.equip(.gold)
+        XCTAssertEqual(s.skin, .neon)
+        s.clearedStages = [1, 2, 3]
+        XCTAssertTrue(s.owns(.gold))
+    }
+
+    func testNextGoalIsCheapestLockedSkin() {
+        var s = SaveData()
+        XCTAssertEqual(s.nextGoal?.title, Skin.neon.title)
+        s.ownedSkins = ["neon", "toxic", "stealth"]
+        XCTAssertNotNil(s.nextGoal?.symbol) // falls back to a Tech Lab upgrade
+    }
+
+    func testRookieLevelsFasterAndOffersSwarm() {
+        XCTAssertLessThan(Rookie.xpNeeded(1), xpToNext(1))
+        XCTAssertEqual(Rookie.xpNeeded(Rookie.freeLevels), xpToNext(Rookie.freeLevels))
+        let l = Loadout()
+        let opts = Rookie.featureSwarm([.passive(.speed, toLevel: 1), .weapon(.zap, toLevel: 1), .weapon(.laser, toLevel: 2)], loadout: l)
+        XCTAssertEqual(opts.count, 3)
+        XCTAssertEqual(opts.first, .weapon(.swarm, toLevel: 1))
+        let already = Rookie.featureSwarm([.weapon(.swarm, toLevel: 1), .heal, .coins(25)], loadout: l)
+        XCTAssertEqual(already, [.weapon(.swarm, toLevel: 1), .heal, .coins(25)])
+    }
 }

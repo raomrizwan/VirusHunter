@@ -15,6 +15,12 @@ Fly through the body organ by organ, survive the infection waves and destroy the
 5. At 4:00 the **boss** arrives. Kill it → organ cleared → Bio-Coins + next organ unlocked.
 6. Die → summary (time, kills, coins). One revive per run (rewarded ad), double coins (rewarded ad).
 
+## First run (new players)
+No intro slides: a fresh install drops straight into a Lungs run with a "Drag anywhere to fly" hint.
+That first run is tuned to feel strong fast: early levels need half the XP, +25% damage,
+and Nano Swarm is the first card on the first level-up. Menus come after the first run.
+The result screen shows what the run unlocked and a coin bar towards the next skin or Tech Lab upgrade.
+
 ## Hook: Nano Swarm
 Signature weapon: **Swarm** — mini nanobots orbit, dart at the nearest virus and return. Each level adds a bot.
 At level 5 the swarm is a glowing cloud. It is the thing people screenshot.
@@ -52,6 +58,10 @@ Difficulty scales with stage number.
 ## Meta — Tech Lab (Bio-Coins)
 Permanent upgrades: Power, Armor (−dmg), Max HP, Speed, Magnet, Coin bonus, Revive (one free).
 Each 10 levels, rising cost.
+
+## Nano skins
+Classic (free), Neon 250, Toxic 600, Stealth 1200 Bio-Coins; Golden for clearing the Stomach.
+Skins recolour Nano and the swarm mini-bots (`Art/art.py` SKINS palettes). Pick them from Home (tap Nano or "Skins").
 
 ## Monetization
 Free. Rewarded: revive, double coins. Interstitial between runs (from 3rd run, every 2nd, ≥ 90 s apart).
