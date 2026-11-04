@@ -19,8 +19,26 @@ final class Enemy {
     var timerB: Double = 0
     var dashing: Double = 0
     var dashDir = CGVector.zero
+    var timerC: Double = 0
+    var spin: Double = 0       // rotating aim for spiral attacks
+    var phase = 0              // boss phase (King Vex enrages at half health)
+    var golden = false         // Golden Virus event: flees, drops lots of coins
+    var slowT: Double = 0      // Freeze Ray chill
+    var slowAmt: Double = 0
     var shieldHitCD: Double = 0
     var fieldHitCD: Double = 0
+    var variant: BossVariant = .normal
+    var title: String = ""
+    var variantT: Double = 4   // boss variant ability timer
+    var summoned = false       // Mega boss already called for backup
+    var cloaked = false        // Shadow boss is invisible right now
+    var targetsBed = false     // Hospital Defense: heads for the patient's bed instead of Nano
+    var armorT: Double = 0     // Baron Bacter's armor: takes 10% damage while > 0
+    var sawHitCD: Double = 0
+    var aux: SKNode?           // extra visual (sniper aim line)
+    /// Resting tint (boss variant, Golden Virus, enraged Vex); hit flashes return to it.
+    var baseTint: UIColor = .white
+    var baseBlend: CGFloat = 0
     var alive = true
     /// Idle wiggle, animated in `render()` rather than with per-node SKActions (hundreds of those add up).
     var wobblePhase = 0.0
@@ -33,9 +51,14 @@ final class Enemy {
     }
 }
 
-private struct Bolt { var pos: CGPoint; var vel: CGVector; var damage: Double; var pierce: Int; var life: Double; let node: SKSpriteNode; var hit: Set<ObjectIdentifier> = [] }
-private struct Shot { var pos: CGPoint; var vel: CGVector; var damage: Double; var life: Double; let node: SKSpriteNode }
+private struct Bolt { var pos: CGPoint; var vel: CGVector; var damage: Double; var pierce: Int; var life: Double; let node: SKSpriteNode; var hit: Set<ObjectIdentifier> = []
+    var blast: Double = 0      // > 0: homing missile that explodes on hit
+}
+private struct Shot { var pos: CGPoint; var vel: CGVector; var damage: Double; var life: Double; let node: SKSpriteNode
+    var chill = false          // Frost boss: slows Nano on hit
+}
 private struct Bomb { var pos: CGPoint; var fuse: Double; let node: SKSpriteNode }
+private struct Puddle { var pos: CGPoint; var life: Double; var armed: Double; let node: SKShapeNode; var radius: Double = 70 }
 private enum PickupKind { case xp(Int), coin(Int), heart, chest }
 private struct Pickup { let kind: PickupKind; var pos: CGPoint; let node: SKSpriteNode; var pulled = false }
 private final class Bot {
@@ -99,6 +122,11 @@ final class GameScene: SKScene {
     private var bots: [Bot] = []
     private var shieldNodes: [SKSpriteNode] = []
     private var shieldAngle: Double = 0
+    private var sawNodes: [SKSpriteNode] = []
+    private var sawAngle: Double = 0
+    private var rainT = 1.0
+    /// Boss DNA earned this run (Craft Lab material).
+    private(set) var dnaEarned = 0
     private let fieldNode = SKShapeNode(circleOfRadius: 70)
     private var grid: [Int: [Enemy]] = [:]
     private let cell: Double = 72
@@ -111,11 +139,88 @@ final class GameScene: SKScene {
     private var pendingLevels = 0
     private var kills = 0
     private var coinsCollected = 0
-    private var laserT = 0.0, zapT = 0.0, bombT = 0.0, fieldT = 0.0
+    private var laserT = 0.0, zapT = 0.0, bombT = 0.0, fieldT = 0.0, freezeT = 0.0, missileT = 0.0
     private var nextElite: Double = 60
     private var nextBoss: Double
     private var bossCount = 0
+    private var bossKills = 0
+    /// This city's twist (see `CityMutation`).
+    private let mutation: CityMutation
+    private var puddles: [Puddle] = []
+    private var nextPuddle = 3.0
+    /// This run's boss and its variant, and the special viruses joining the mix.
+    private let bossSetup: BossSetup
+    private let extraKinds: [EnemyKind]
+    /// This city's look for regular viruses, its mid-run mini boss, and the drifting background cells.
+    private let strain: VirusStrain?
+    private let miniKind: EnemyKind
+    private var nextMini = 125.0
+    private var magnetPull = CGVector.zero
+    private var parallax: [(node: SKSpriteNode, base: CGPoint, depth: CGFloat)] = []
+    // Virus-pedia: every character met this run (texture names).
+    private(set) var seen = Set<String>()
+    // Kill combo and the boss knockout slow motion.
+    private var combo = 0, bestCombo = 0
+    private var lastKillT = -10.0
+    private var timeScale = 1.0
+    // Ally (Dr. Leuko's white blood cell)
+    private let ally: Ally?
+    private let allyNode = SKSpriteNode()
+    private var allyT = 2.0
+    private var allyPos = CGPoint.zero
+    // Special missions
+    private let mode: RunMode
+    private let bedPos = CGPoint.zero
+    private var bedHP = 100.0
+    private let bedNode = SKSpriteNode()
+    private var exitPos = CGPoint.zero
+    private let exitNode = SKShapeNode(circleOfRadius: 70)
+    private let exitArrow = SKShapeNode()
+    // Boss Rush
+    private var rushIndex = 0
+    private let rushLineup: [BossSetup]
+    /// Enemy whose attack is firing right now (boss variants color and chill its shots).
+    private weak var shooter: Enemy?
+    private var chilled = 0.0          // Frost shots slow Nano
+    private var darkness: SKSpriteNode?
+    // Random events
+    private var nextGolden = Double.random(in: 55...95)
+    private var nextSupply = Double.random(in: 70...110)
+    private var ambushAt = Double.random(in: 100...190)
+    private var ambushEnds: Double?
+    private var goldenKills = 0
+    // Organ hazards (each stage has its own danger)
+    private var nextHazard = 18.0
+    private var wind = CGVector.zero
+    private var windLeft = 0.0
+    private var rush = 0.0                 // Heart: viruses sprint during a heartbeat
+    // Bonus objective
+    private enum Objective { case noHit, kills, fastBoss, chests }
+    private var objective: Objective?
+    private var lastHit = 0.0
+    private var bossSpawnedAt: Double?
+    private var chestsOpened = 0
+    private var objectiveDone = false
     private weak var boss: Enemy?
+    // Pet
+    private let pet: Pet?
+    private let petLevel: Int
+    private let petNode = SKSpriteNode()
+    private var petPos = CGPoint.zero
+    private var petT = 2.0
+    private var bubbleUp = false
+    private var bubbleNode: SKSpriteNode?
+    // Nemesis: the boss that last beat Nano comes back mid-run
+    private let nemesis: Nemesis?
+    private var nemesisSpawned = false
+    private weak var nemesisEnemy: Enemy?
+    private(set) var nemesisBeaten = false
+    // Ghost of the best clear, and this run's recording
+    private let ghost: Ghost?
+    private let ghostNode = SKSpriteNode()
+    private var ghostGone = false
+    private var recXs: [Float] = [], recYs: [Float] = []
+    private var recT = 0.0
     private var bossDefeated = false
     private var simPaused = false
     private var over = false
@@ -126,6 +231,13 @@ final class GameScene: SKScene {
     private let rookie: Bool
     private var swarmFeatured = false
     private var labelPool: [SKLabelNode] = []
+    /// Damage numbers on screen and new ones allowed this frame. Each new number re-renders its
+    /// text, so a big swarm hit by many weapons used to drag the frame rate down as levels grew.
+    private var numbersAlive = 0
+    private var numberBudget = 0
+    /// Effect sprites (sparks, rings) on screen, counted here instead of copying fxLayer.children.
+    private var fxAlive = 0
+    private static var ringTextures: [Bool: SKTexture] = [:]
 
     init(size: CGSize, state: RunState, save: SaveData, autoplay: Bool = false, god: Bool = false) {
         self.state = state
@@ -139,6 +251,26 @@ final class GameScene: SKScene {
         if rookie { stats.damage *= Rookie.damageBoost }
         self.stats = stats
         self.nextBoss = state.organ.bossTime
+        switch state.organ.mode(country: save.country.id) {
+        case .defense: self.nextBoss = RunMode.defenseBossTime
+        case .escape: self.nextBoss = .infinity
+        case .normal: break
+        }
+        if state.organ.isBossRush { self.nextBoss = 4; self.nextMini = .infinity }
+        let mutation = state.organ.mutation(country: save.country.id)
+        self.mutation = mutation
+        self.bossSetup = state.organ.bossSetup(country: save.country.id)
+        self.extraKinds = state.organ.extraKinds(country: save.country.id)
+        self.strain = state.organ.strain(country: save.country.id)
+        self.miniKind = state.organ.miniBoss(country: save.country.id)
+        self.ally = save.ally
+        self.pet = save.pet
+        self.petLevel = save.pet.map { save.petLevel($0) } ?? 1
+        self.nemesis = save.nemesisHunts(state.organ) ? save.nemesis : nil
+        self.ghost = state.organ.isSideMode ? nil : GhostStore.load(GhostStore.key(country: save.country.id, organ: state.organ.id))
+        self.mode = state.organ.mode(country: save.country.id)
+        self.rushLineup = BossRush.lineup(week: BossRush.week())
+        self.nextElite = mutation.eliteInterval ?? state.organ.eliteInterval
         super.init(size: size)
         hp = stats.maxHP
         scaleMode = .resizeFill
@@ -159,11 +291,25 @@ final class GameScene: SKScene {
         addChild(world)
         camera = cam
         addChild(cam)
-        let bg = tex("bg-\(state.organ.key)")
+        let bg = tex(state.organ.backdrop)
         for _ in 0..<9 {
             let s = SKSpriteNode(texture: bg, size: CGSize(width: tile, height: tile))
-            s.alpha = 0.5; s.zPosition = -100
+            s.alpha = 0.62; s.zPosition = -100
+            if let t = strain?.tint { s.color = UIColor(red: t.r, green: t.g, blue: t.b, alpha: 1); s.colorBlendFactor = 0.22 }
             world.addChild(s); bgTiles.append(s)
+        }
+        // Soft cells drifting at different depths make the arena feel alive.
+        let glowTex = tex("glow")
+        let accent = strain.map { UIColor(red: $0.tint.r, green: $0.tint.g, blue: $0.tint.b, alpha: 1) } ?? UIColor(white: 1, alpha: 1)
+        for i in 0..<14 {
+            let n = SKSpriteNode(texture: glowTex)
+            let depth = CGFloat(i % 2 == 0 ? 0.25 : 0.5)
+            let sz = CGFloat.random(in: 60...160) * (depth < 0.3 ? 1.4 : 1)
+            n.size = CGSize(width: sz, height: sz)
+            n.color = accent; n.colorBlendFactor = strain == nil ? 0 : 0.6
+            n.alpha = CGFloat.random(in: 0.05...0.12); n.blendMode = .add; n.zPosition = -50
+            cam.addChild(n)
+            parallax.append((n, CGPoint(x: CGFloat.random(in: 0...1200), y: CGFloat.random(in: 0...1200)), depth))
         }
         for (l, z) in [(pickupLayer, 1.0), (enemyLayer, 2.0), (shotLayer, 4.0), (fxLayer, 6.0)] { l.zPosition = CGFloat(z); world.addChild(l) }
 
@@ -190,12 +336,26 @@ final class GameScene: SKScene {
         joyBase.fillColor = UIColor(white: 1, alpha: 0.06)
         joyKnob.fillColor = UIColor(red: 0.45, green: 0.95, blue: 1, alpha: 0.45)
 
+        state.loadout.locked = save.lockedWeapons
         state.onChoose = { [weak self] o in self?.choose(o) }
         state.onResume = { [weak self] in self?.simPaused = false; self?.state.phase = .playing }
         state.onRevive = { [weak self] in self?.revive() }
         rebuildWeapons()
         // A few starting viruses so the screen is never empty.
         for _ in 0..<6 { spawn(.spiky) }
+        setupDarkness()
+        setupAlly()
+        setupPet()
+        setupGhost()
+        setupMode()
+        if state.organ.isBossRush {
+            // Boss Rush starts with four upgrades, so Nano isn't facing five bosses at level 1.
+            pendingLevels = 4
+            state.flash("👑 WEEKLY BOSS RUSH!", seconds: 2.5)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in self?.showLevelUp(fromChest: false) }
+        }
+        pickObjective()
+        if mutation != .none { state.flash("\(mutation.title.uppercased())!", seconds: 3) }
         state.moveHint = rookie && !autoplay
         pushHUD()
     }
@@ -252,11 +412,13 @@ final class GameScene: SKScene {
         // Capped at two steps so a heavy frame can't snowball into ever heavier ones.
         var remaining = min(rawDt, 1.0 / 15)
         while remaining > 0.0001, !simPaused, !over {
-            let dt = min(remaining, 1.0 / 30)
-            remaining -= dt
+            let real = min(remaining, 1.0 / 30)
+            remaining -= real
+            let dt = real * timeScale // slow motion after a boss knockout
             time += dt
             step(dt)
         }
+        numberBudget = 3
         render()
         hudTimer -= rawDt
         if hudTimer <= 0 { hudTimer = 0.1; pushHUD() }
@@ -265,9 +427,15 @@ final class GameScene: SKScene {
     private func step(_ dt: Double) {
         if autoplay { moveDir = autoDirection() }
         // player
-        let sp = stats.speed
-        ppos.x += moveDir.dx * sp * dt
-        ppos.y += moveDir.dy * sp * dt
+        var sp = stats.speed
+        if chilled > 0 {
+            chilled -= dt; sp *= 0.6
+            player.color = UIColor(red: 0.55, green: 0.85, blue: 1, alpha: 1)
+            player.colorBlendFactor = chilled > 0 ? 0.55 : 0
+        }
+        ppos.x += (moveDir.dx * sp + wind.dx + magnetPull.dx) * dt
+        ppos.y += (moveDir.dy * sp + wind.dy + magnetPull.dy) * dt
+        magnetPull = .zero
         if abs(moveDir.dx) > 0.1 { player.xScale = moveDir.dx < 0 ? -1 : 1 }
         hp = min(stats.maxHP, hp + stats.regen * dt)
         invuln = max(0, invuln - dt)
@@ -280,6 +448,14 @@ final class GameScene: SKScene {
         moveShots(dt)
         updateBombs(dt)
         updatePickups(dt)
+        updatePuddles(dt)
+        updateAlly(dt)
+        updatePet(dt)
+        updateGhost(dt)
+        updateNemesis()
+        updateMode(dt)
+        updateHazards(dt)
+        updateObjective()
         contactDamage()
         compact()
     }
@@ -291,21 +467,31 @@ final class GameScene: SKScene {
         if !bossDefeated {
             var rate = Spawner.rate(time: time, organ: organ)
             if boss != nil { rate *= 0.5 }
+            rate *= mutation.spawnScale
+            if state.organ.isBossRush { rate *= 0.45 }
+            if mode == .escape { rate *= 1.3 }
             spawnAcc += rate * dt
             while spawnAcc >= 1, enemies.count < 260 {
                 spawnAcc -= 1
-                let k = Spawner.pick(time: time, rng: &rng)
-                if k == .mini { for _ in 0..<Int.random(in: 3...5) { spawn(.mini, near: true) } } else { spawn(k) }
+                let k = Spawner.pick(time: time, extra: extraKinds, rng: &rng)
+                if k == .mini { for _ in 0..<Int.random(in: 3...5) { spawn(.mini, near: true) } }
+                else if k == .spore { groupPoint = nil; for _ in 0..<Int.random(in: 4...6) { spawn(.spore, near: true) } }
+                else { spawn(k) }
             }
             if spawnAcc > 3 { spawnAcc = 3 }
         }
         if time >= nextElite && !bossDefeated {
-            nextElite += 60
+            nextElite += eliteInterval
             spawn(.elite)
         }
         if time >= nextBoss && boss == nil && !bossDefeated {
             spawnBoss()
         }
+        if time >= nextMini && boss == nil && !bossDefeated {
+            nextMini = state.organ.isEndless ? time + 150 : .infinity
+            spawnMiniBoss()
+        }
+        events()
     }
 
     private var groupPoint: CGPoint?
@@ -316,7 +502,7 @@ final class GameScene: SKScene {
     }
 
     @discardableResult
-    private func spawn(_ kind: EnemyKind, near: Bool = false, at: CGPoint? = nil) -> Enemy {
+    private func spawn(_ kind: EnemyKind, near: Bool = false, at: CGPoint? = nil, hpMul: Double = 1, sizeMul: Double = 1) -> Enemy {
         var p = at ?? spawnPoint()
         if near, at == nil {
             if groupPoint == nil || Double.random(in: 0..<1) < 0.25 { groupPoint = spawnPoint() }
@@ -324,37 +510,77 @@ final class GameScene: SKScene {
         }
         let b = kind.base
         let diff = state.organ.difficulty
-        let hpScale = kind.isBoss ? diff * (1 + 0.5 * Double(bossCount)) : Spawner.healthScale(time: time) * diff
-        let node = SKSpriteNode(texture: tex(kind.texture))
-        let s = b.radius * kind.spriteScale
+        let bossGrowth = state.organ.isBossRush ? 0.15 : 0.5
+        let hpScale = (kind.isBoss ? diff * (1 + bossGrowth * Double(bossCount)) : Spawner.healthScale(time: time) * diff * mutation.healthScale) * hpMul
+        let node = SKSpriteNode(texture: tex(kind.texture(strain: strain)))
+        let radius = (kind.isBoss ? b.radius : b.radius * mutation.sizeScale) * sizeMul
+        let s = radius * kind.spriteScale
         node.size = CGSize(width: s, height: s)
         node.position = p
         enemyLayer.addChild(node)
-        let speedJitter = kind.isBoss ? 1 : Double.random(in: 0.9...1.12)
-        let e = Enemy(kind: kind, node: node, pos: p, hp: b.hp * hpScale, speed: b.speed * speedJitter, radius: b.radius,
-                      damage: b.damage * (0.85 + 0.15 * diff), xp: b.xp)
+        let speedJitter = (kind.isBoss ? 1 : Double.random(in: 0.9...1.12) * mutation.speedScale) * state.organ.speedScale
+        let e = Enemy(kind: kind, node: node, pos: p, hp: b.hp * hpScale, speed: b.speed * speedJitter, radius: radius,
+                      damage: b.damage * (0.85 + 0.15 * diff), xp: kind.isBoss ? b.xp : b.xp * mutation.xpScale)
         e.timerA = Double.random(in: 1.5...3)
         e.wobblePhase = Double.random(in: 0..<(2 * .pi))
         e.wobbleAngle = kind == .dart ? 0 : CGFloat.random(in: 0.08...0.16)
+        e.title = kind.bossTitle
+        if !kind.isBoss { seen.insert(kind.texture(strain: strain)) }
+        if mode == .defense, !kind.isBoss, !kind.isMiniBoss, Double.random(in: 0..<1) < 0.6 { e.targetsBed = true }
         enemies.append(e)
         return e
     }
 
+    /// A named mini boss mid-run: Brood Queen, Turret Tick, Rhino Charger or Magnet Mite.
+    private func spawnMiniBoss() {
+        let kind = state.organ.isEndless ? EnemyKind.miniBosses.randomElement() ?? .miniQueen : miniKind
+        let a = Double.random(in: 0..<(2 * .pi))
+        let e = spawn(kind, at: CGPoint(x: ppos.x + cos(a) * 300, y: ppos.y + sin(a) * 300))
+        e.title = kind.miniTitle; e.timerA = 2.5; e.timerB = 3
+        Sound.warning.play(); Haptics.medium(); shake = 0.3
+        state.flash("⚠️ MINI BOSS: \(kind.miniTitle.uppercased())", seconds: 2.5)
+    }
+
     private func spawnBoss() {
-        let kinds: [EnemyKind] = [.bossSumo, .bossCowboy, .bossRoyal]
-        let kind = state.organ.isEndless ? kinds[bossCount % 3] : state.organ.boss
+        let kinds = EnemyKind.bossRoster
+        var setup = bossSetup
+        if state.organ.isBossRush {
+            setup = rushLineup[min(rushIndex, rushLineup.count - 1)]
+        } else if state.organ.isEndless {
+            // Endless: the classic five first, then random variants.
+            setup = BossSetup(kind: kinds[bossCount % kinds.count],
+                              variant: bossCount < kinds.count ? .normal : BossVariant.twists.randomElement() ?? .normal)
+        }
+        let kind = setup.kind, v = setup.variant
         let a = Double.random(in: 0..<(2 * .pi))
         let p = bossNear ? CGPoint(x: ppos.x, y: ppos.y + 175) : CGPoint(x: ppos.x + cos(a) * 320, y: ppos.y + sin(a) * 320)
-        let e = spawn(kind, at: p)
+        let e = spawn(kind, at: p, hpMul: v.hpScale, sizeMul: v.sizeScale)
+        e.variant = v; e.title = setup.title; e.speed *= v.speedScale
+        e.node.texture = tex(setup.texture)
+        seen.insert(setup.texture)
+        if let t = v.tint {
+            // The variant art already has its colors; the tint colors its shots and returns after hit flashes.
+            e.baseTint = UIColor(red: t.r, green: t.g, blue: t.b, alpha: 1); e.baseBlend = 0
+            restoreTint(e)
+        }
         e.node.run(.repeatForever(.sequence([.scale(to: 1.04, duration: 0.6), .scale(to: 0.97, duration: 0.6)])))
         e.timerA = 3; e.timerB = 5
         boss = e
         bossCount += 1
+        if bossSpawnedAt == nil { bossSpawnedAt = time }
         Sound.warning.play()
         Haptics.medium()
         shake = 0.5
-        state.flash("⚠️ \(kind.bossTitle.uppercased()) INCOMING", seconds: 2.5)
+        state.flash(state.organ.isBossRush ? "BOSS \(rushIndex + 1)/\(BossRush.bosses): \(setup.title.uppercased())" : "⚠️ \(setup.title.uppercased()) INCOMING", seconds: 2.5)
         if state.organ.isEndless { nextBoss = time + state.organ.bossTime }
+        if mutation == .twinBoss, !state.organ.isEndless {
+            // Second boss of another kind on the other side of Nano.
+            let twin: EnemyKind = kinds.first { $0 != kind && $0 != .bossMarrow } ?? .bossCowboy
+            let t = spawn(twin, at: CGPoint(x: ppos.x - (p.x - ppos.x), y: ppos.y - (p.y - ppos.y)))
+            seen.insert(twin.texture)
+            t.timerA = 4; t.timerB = 6
+            state.flash("⚠️ TWIN BOSSES INCOMING", seconds: 2.5)
+        }
     }
 
     // MARK: spatial grid
@@ -365,7 +591,10 @@ final class GameScene: SKScene {
     }
 
     private func rebuildGrid() {
-        grid.removeAll(keepingCapacity: true)
+        // Reuse the cell arrays instead of reallocating them every step; drop them once the
+        // player has wandered across many cells.
+        if grid.count > 400 { grid.removeAll(keepingCapacity: true) }
+        else { for k in grid.keys { grid[k]?.removeAll(keepingCapacity: true) } }
         for e in enemies where e.alive { grid[key(Double(e.pos.x), Double(e.pos.y)), default: []].append(e) }
     }
 
@@ -392,10 +621,23 @@ final class GameScene: SKScene {
 
     private func moveEnemies(_ dt: Double) {
         for e in enemies where e.alive {
-            var toP = sub(ppos, e.pos)
+            var toP = sub(e.targetsBed ? bedPos : ppos, e.pos)
             let d = len(toP)
+            if e.targetsBed, d < e.radius + 46 {
+                // A virus reached Patient Zero's bed.
+                hitBed(e.damage * 0.6)
+                e.alive = false; burst(at: e.pos, kind: e.kind)
+                e.node.run(.sequence([.fadeOut(withDuration: 0.1), .removeFromParent()]))
+                continue
+            }
             toP = d > 0 ? CGVector(dx: toP.dx / d, dy: toP.dy / d) : .zero
             var v = CGVector(dx: toP.dx * e.speed, dy: toP.dy * e.speed)
+            if e.golden {
+                // Runs away a little slower than Nano, and escapes after 15 s.
+                e.timerC -= dt
+                if e.timerC <= 0 { e.alive = false; e.node.run(.sequence([.fadeOut(withDuration: 0.3), .removeFromParent()])); state.flash("The Golden Virus escaped..."); continue }
+                v = CGVector(dx: -toP.dx * stats.speed * 0.82, dy: -toP.dy * stats.speed * 0.82)
+            } else {
             switch e.kind {
             case .dart:
                 e.timerA -= dt
@@ -410,9 +652,59 @@ final class GameScene: SKScene {
                 if d < 230 { v = CGVector(dx: -toP.dx * e.speed * 0.6, dy: -toP.dy * e.speed * 0.6) }
                 e.timerA -= dt
                 if e.timerA <= 0, d < 420 { e.timerA = 2.6; fire(from: e.pos, dir: toP, speed: 190, damage: 8) }
-            case .bossSumo, .bossCowboy, .bossRoyal:
+            case .bomber:
+                // Runs up to Nano, stops, flashes red for 0.8 s, then explodes (hurting viruses too).
+                if e.phase == 1 {
+                    v = .zero
+                    e.timerB -= dt
+                    if e.timerB <= 0 { bomberBlast(e); continue }
+                } else if d < 72 {
+                    e.phase = 1; e.timerB = 0.8
+                    e.baseTint = UIColor(red: 1, green: 0.2, blue: 0.15, alpha: 1); e.baseBlend = 0.65; restoreTint(e)
+                    Sound.warning.play(volume: 0.25, minGap: 0.3)
+                }
+            case .healer:
+                // Keeps its distance and heals the viruses around it.
+                if d < 190 { v = CGVector(dx: -toP.dx * e.speed, dy: -toP.dy * e.speed) }
+                else if d < 270 { v = CGVector(dx: -toP.dy * e.speed * 0.6, dy: toP.dx * e.speed * 0.6) }
+                e.timerA -= dt
+                if e.timerA <= 0 { e.timerA = 3; healAround(e) }
+            case .sniper:
+                // Holds back, shows a red aim line, then fires one very fast shot along it.
+                e.timerA -= dt
+                if e.phase == 1 {
+                    v = .zero
+                    e.timerB -= dt
+                    e.aux?.position = e.pos
+                    if e.timerB <= 0 {
+                        e.phase = 0; e.timerA = 3.4
+                        e.aux?.removeFromParent(); e.aux = nil
+                        fire(from: e.pos, dir: e.dashDir, speed: 560, damage: 12, tint: UIColor(red: 1, green: 0.25, blue: 0.3, alpha: 1))
+                    }
+                } else {
+                    if d < 290 { v = CGVector(dx: -toP.dx * e.speed, dy: -toP.dy * e.speed) } else if d < 380 { v = .zero }
+                    if e.timerA <= 0, d < 560 {
+                        e.phase = 1; e.timerB = 0.9; e.dashDir = toP
+                        let path = CGMutablePath(); path.move(to: .zero); path.addLine(to: CGPoint(x: toP.dx * 700, y: toP.dy * 700))
+                        let l = SKShapeNode(path: path)
+                        l.strokeColor = UIColor(red: 1, green: 0.25, blue: 0.3, alpha: 0.8); l.lineWidth = 2; l.position = e.pos; l.zPosition = 3
+                        l.run(.repeatForever(.sequence([.fadeAlpha(to: 0.3, duration: 0.1), .fadeAlpha(to: 1, duration: 0.1)])))
+                        fxLayer.addChild(l); e.aux = l
+                    }
+                }
+            case .spore:
+                // Drifts in weaving clusters.
+                let w = sin(time * 3 + e.wobblePhase) * 0.9
+                v = CGVector(dx: (toP.dx - toP.dy * w) * e.speed, dy: (toP.dy + toP.dx * w) * e.speed)
+            case .miniQueen, .miniTurret, .miniRhino, .miniMagnet:
+                v = miniAI(e, toP: toP, d: d, dt: dt)
+            case .bossSumo, .bossCowboy, .bossRoyal, .bossBrain, .bossMarrow, .bossVex, .bossVira, .bossSultan, .bossBaron, .bossGeneral:
+                shooter = e
                 v = bossAI(e, toP: toP, d: d, dt: dt)
+                variantAbility(e, dt: dt)
+                shooter = nil
             default: break
+            }
             }
             // separation from neighbours
             var push = CGVector.zero
@@ -423,16 +715,23 @@ final class GameScene: SKScene {
                 if dd < min, dd > 0.01 { let f = (min - dd) / min; push.dx += dv.dx / dd * f * 90; push.dy += dv.dy / dd * f * 90 }
             }
             if e.kind.isBoss { push = CGVector(dx: push.dx * 0.1, dy: push.dy * 0.1) }
-            e.pos.x += (v.dx + push.dx + e.knock.dx) * dt
-            e.pos.y += (v.dy + push.dy + e.knock.dy) * dt
+            if rush > 0, !e.kind.isBoss { v = CGVector(dx: v.dx * 1.8, dy: v.dy * 1.8) }
+            if e.slowT > 0 {
+                e.slowT -= dt
+                let k = 1 - e.slowAmt * (e.kind.isBoss ? 0.5 : 1)
+                v = CGVector(dx: v.dx * k, dy: v.dy * k)
+                if e.slowT <= 0 { restoreTint(e) }
+            }
+            e.pos.x += (v.dx + push.dx + e.knock.dx + wind.dx * 0.6) * dt
+            e.pos.y += (v.dy + push.dy + e.knock.dy + wind.dy * 0.6) * dt
             e.knock = CGVector(dx: e.knock.dx * 0.86, dy: e.knock.dy * 0.86)
-            e.shieldHitCD -= dt; e.fieldHitCD -= dt
+            e.shieldHitCD -= dt; e.fieldHitCD -= dt; e.sawHitCD -= dt
             if e.flash > 0 {
                 e.flash -= dt
-                e.node.colorBlendFactor = e.flash > 0 ? 0.85 : 0
+                if e.flash > 0 { e.node.colorBlendFactor = 0.85 } else { restoreTint(e) }
             }
             // Keep pressure: viruses left far behind come back around.
-            if d > Double(max(size.width, size.height)) * 1.3, !e.kind.isBoss {
+            if d > Double(max(size.width, size.height)) * 1.3, !e.kind.isBoss, !e.kind.isMiniBoss, !e.golden {
                 e.pos = spawnPoint()
             }
         }
@@ -484,9 +783,238 @@ final class GameScene: SKScene {
                     fire(from: e.pos, dir: CGVector(dx: cos(a), dy: sin(a)), speed: 230, damage: 11)
                 }
             }
+        case .bossBrain:
+            // Mind Leech: a slow psychic spiral, and it blinks next to Nano with a shockwave.
+            v = CGVector(dx: v.dx * 0.7, dy: v.dy * 0.7)
+            e.timerC -= dt
+            if e.timerC <= 0 {
+                e.timerC = 0.22
+                e.spin += 0.55
+                for k in 0..<2 {
+                    let a = e.spin + Double(k) * .pi
+                    fire(from: e.pos, dir: CGVector(dx: cos(a), dy: sin(a)), speed: 140, damage: 8)
+                }
+            }
+            if e.timerA <= 0 {
+                e.timerA = 5
+                let a = Double.random(in: 0..<(2 * .pi))
+                let target = CGPoint(x: ppos.x + cos(a) * 190, y: ppos.y + sin(a) * 190)
+                e.node.run(.fadeAlpha(to: 0.25, duration: 0.6))
+                telegraphStomp(at: target, radius: 120) { [weak self, weak e] in
+                    guard let self, let e, e.alive else { return }
+                    e.pos = target; e.node.position = target; e.node.alpha = 1
+                    if dist2(self.ppos, target) < 120 * 120 { self.hurt(e.damage) }
+                    self.shooter = e; defer { self.shooter = nil }
+                    self.ring(from: target, count: 12, speed: 180, damage: 10)
+                }
+            }
+        case .bossMarrow:
+            // Bone Colossus: volleys of bone spears, calls in blobs, and speeds up when hurt.
+            if e.hp < e.maxHP * 0.5 { v = CGVector(dx: v.dx * 1.7, dy: v.dy * 1.7) }
+            if e.timerA <= 0 {
+                e.timerA = 4.5
+                for w in 0..<3 {
+                    run(.sequence([.wait(forDuration: 0.35 * Double(w)), .run { [weak self, weak e] in
+                        guard let self, let e, e.alive, !self.simPaused else { return }
+                        self.shooter = e; defer { self.shooter = nil }
+                        self.ring(from: e.pos, count: 8, speed: 210, damage: 12, offset: Double(w) * .pi / 8)
+                    }]))
+                }
+            }
+            if e.timerB <= 0 {
+                e.timerB = 7
+                for _ in 0..<2 { spawn(.blob, at: jitter(e.pos, 80)) }
+                for _ in 0..<4 { spawn(.mini, at: jitter(e.pos, 60)) }
+            }
+        case .bossVira, .bossSultan, .bossBaron, .bossGeneral:
+            v = villainAI(e, toP: toP, d: d, dt: dt)
+        case .bossVex:
+            // King Vex: dashes, rings and summons; at half health he enrages and teleport-stomps.
+            if e.phase == 0, e.hp < e.maxHP * 0.5 {
+                e.phase = 1
+                state.flash("KING VEX IS ENRAGED!", seconds: 2.5)
+                shake = 0.6; Haptics.medium(); Sound.warning.play()
+                e.baseTint = .red; e.baseBlend = 0.35; restoreTint(e)
+            }
+            let rage = e.phase == 1
+            if e.dashing > 0 {
+                e.dashing -= dt
+                v = CGVector(dx: e.dashDir.dx * 480, dy: e.dashDir.dy * 480)
+            }
+            e.timerC -= dt
+            if rage, e.timerC <= 0 {
+                e.timerC = 0.16
+                e.spin -= 0.45
+                for k in 0..<3 {
+                    let a = e.spin + Double(k) * 2 * .pi / 3
+                    fire(from: e.pos, dir: CGVector(dx: cos(a), dy: sin(a)), speed: 150, damage: 8)
+                }
+            }
+            if e.timerA <= 0 {
+                e.timerA = rage ? 3 : 4
+                if rage {
+                    let target = CGPoint(x: ppos.x + CGFloat.random(in: -60...60), y: ppos.y + CGFloat.random(in: -60...60))
+                    telegraphStomp(at: target, radius: 150) { [weak self, weak e] in
+                        guard let self, let e, e.alive else { return }
+                        e.pos = target; e.node.position = target
+                        if dist2(self.ppos, target) < 150 * 150 { self.hurt(e.damage * 1.2) }
+                        self.ring(from: target, count: 20, speed: 200, damage: 11)
+                    }
+                } else if Bool.random() {
+                    e.dashing = 0.6; e.dashDir = toP
+                } else {
+                    ring(from: e.pos, count: 18, speed: 180, damage: 11)
+                }
+            }
+            if e.timerB <= 0 {
+                e.timerB = rage ? 6 : 8
+                spawn(.elite, at: jitter(e.pos, 120))
+                for i in 0..<6 {
+                    let a = Double(i) / 6 * 2 * .pi
+                    spawn(.spiky, at: CGPoint(x: e.pos.x + cos(a) * 100, y: e.pos.y + sin(a) * 100))
+                }
+            }
         default: break
         }
         return v
+    }
+
+    private func miniAI(_ e: Enemy, toP: CGVector, d: Double, dt: Double) -> CGVector {
+        e.timerA -= dt; e.timerB -= dt
+        var v = CGVector(dx: toP.dx * e.speed, dy: toP.dy * e.speed)
+        switch e.kind {
+        case .miniQueen:
+            // Lays egg sacs that hatch into minis.
+            if e.timerA <= 0 {
+                e.timerA = 4
+                for _ in 0..<4 { spawn(.mini, at: jitter(e.pos, 50)) }
+                e.node.run(.sequence([.scale(to: 1.2, duration: 0.12), .scale(to: 1, duration: 0.2)]))
+            }
+        case .miniTurret:
+            // Creeps forward and sprays four rotating streams.
+            e.timerC -= dt
+            if e.timerC <= 0 {
+                e.timerC = 0.35
+                e.spin += 0.32
+                for k in 0..<4 {
+                    let a = e.spin + Double(k) * .pi / 2
+                    fire(from: e.pos, dir: CGVector(dx: cos(a), dy: sin(a)), speed: 150, damage: 7, tint: UIColor(red: 1, green: 0.4, blue: 0.25, alpha: 1))
+                }
+            }
+        case .miniRhino:
+            // Three charges in a row, each with a short wind-up, then a rest.
+            if e.dashing > 0 {
+                e.dashing -= dt
+                v = CGVector(dx: e.dashDir.dx * 520, dy: e.dashDir.dy * 520)
+                if e.dashing <= 0 { e.phase += 1; e.timerA = e.phase < 3 ? 0.55 : 3; if e.phase >= 3 { e.phase = 0 } }
+            } else if e.timerA <= 0 {
+                e.dashing = 0.5; e.dashDir = toP
+                Sound.tap.play(volume: 0.5, minGap: 0.1)
+            } else if e.timerA < 0.55 {
+                v = .zero // wind-up
+                e.node.zRotation = CGFloat.random(in: -0.08...0.08)
+            }
+        case .miniMagnet:
+            // Pulls Nano in every few seconds and fires a spread.
+            if e.timerA <= 0 {
+                e.timerA = 6.5; e.timerC = 2
+                let ring = SKShapeNode(circleOfRadius: 90)
+                ring.strokeColor = UIColor(red: 0.37, green: 0.72, blue: 1, alpha: 0.8); ring.lineWidth = 4; ring.glowWidth = 4; ring.zPosition = 3
+                ring.position = e.pos
+                ring.run(.repeatForever(.sequence([.scale(to: 0.3, duration: 0.5), .scale(to: 1, duration: 0)])))
+                fxLayer.addChild(ring); e.aux?.removeFromParent(); e.aux = ring
+                state.flash("🧲 MAGNET PULL!", seconds: 1)
+            }
+            if e.timerC > 0 {
+                e.timerC -= dt
+                v = .zero
+                e.aux?.position = e.pos
+                magnetPull = CGVector(dx: -toP.dx * 150, dy: -toP.dy * 150)
+                if e.timerC <= 0 { e.aux?.removeFromParent(); e.aux = nil }
+            }
+            if e.timerB <= 0 {
+                e.timerB = 2.6
+                for s in [-0.3, 0, 0.3] {
+                    let a = atan2(toP.dy, toP.dx) + s
+                    fire(from: e.pos, dir: CGVector(dx: cos(a), dy: sin(a)), speed: 210, damage: 9)
+                }
+            }
+        default: break
+        }
+        return v
+    }
+
+    /// King Vex's continent lieutenants.
+    private func villainAI(_ e: Enemy, toP: CGVector, d: Double, dt: Double) -> CGVector {
+        var v = CGVector(dx: toP.dx * e.speed, dy: toP.dy * e.speed)
+        e.timerC -= dt
+        switch e.kind {
+        case .bossVira:
+            // Queen Vira: a royal spiral, swarms of minis, and healers on call.
+            if e.timerC <= 0 {
+                e.timerC = 0.2; e.spin += 0.5
+                for k in 0..<3 { let a = e.spin + Double(k) * 2 * .pi / 3; fire(from: e.pos, dir: CGVector(dx: cos(a), dy: sin(a)), speed: 145, damage: 8) }
+            }
+            if e.timerA <= 0 { e.timerA = 6; for _ in 0..<8 { spawn(.mini, at: jitter(e.pos, 70)) } }
+            if e.timerB <= 0 { e.timerB = 10; for _ in 0..<2 { spawn(.healer, at: jitter(e.pos, 120)) }; state.flash("QUEEN VIRA CALLS HER HEALERS!", seconds: 1.5) }
+        case .bossSultan:
+            // Sultan Spore: sandstorms drag Nano in while spore clouds and fan shots fly.
+            if e.timerA <= 0 {
+                e.timerA = 7
+                wind = CGVector(dx: -toP.dx * 130, dy: -toP.dy * 130); windLeft = 2.5
+                state.flash("🌪 SANDSTORM!", seconds: 1.2)
+            }
+            if e.timerB <= 0 { e.timerB = 4; groupPoint = nil; for _ in 0..<6 { spawn(.spore, near: true) } }
+            if e.timerC <= 0 {
+                e.timerC = 1.6
+                for s in [-0.35, -0.17, 0, 0.17, 0.35] { let a = atan2(toP.dy, toP.dx) + s; fire(from: e.pos, dir: CGVector(dx: cos(a), dy: sin(a)), speed: 200, damage: 9) }
+            }
+        case .bossBaron:
+            // Baron Bacter: armors up (90% less damage), then bursts out with a big ring and a dash.
+            if e.armorT > 0 {
+                e.armorT -= dt
+                v = CGVector(dx: v.dx * 0.3, dy: v.dy * 0.3)
+                if e.armorT <= 0 {
+                    e.baseTint = .white; e.baseBlend = 0; restoreTint(e)
+                    ring(from: e.pos, count: 24, speed: 190, damage: 11)
+                    e.dashing = 0.6; e.dashDir = toP
+                }
+            } else if e.timerA <= 0 {
+                e.timerA = 7; e.armorT = 2.4
+                e.baseTint = UIColor(red: 0.75, green: 0.8, blue: 0.9, alpha: 1); e.baseBlend = 0.6; restoreTint(e)
+                state.flash("BARON BACTER ARMORS UP!", seconds: 1.2)
+            }
+            if e.dashing > 0 { e.dashing -= dt; v = CGVector(dx: e.dashDir.dx * 470, dy: e.dashDir.dy * 470) }
+        case .bossGeneral:
+            // General Germ: aimed missile barrages, and he calls in snipers and bombers.
+            if e.timerC <= 0 {
+                e.timerC = 3
+                for w in 0..<5 {
+                    run(.sequence([.wait(forDuration: 0.12 * Double(w)), .run { [weak self, weak e] in
+                        guard let self, let e, e.alive, !self.simPaused else { return }
+                        let dir = norm(sub(self.ppos, e.pos))
+                        let a = atan2(dir.dy, dir.dx) + Double.random(in: -0.12...0.12)
+                        self.fire(from: e.pos, dir: CGVector(dx: cos(a), dy: sin(a)), speed: 280, damage: 10, tint: UIColor(red: 1, green: 0.6, blue: 0.2, alpha: 1))
+                    }]))
+                }
+            }
+            if e.timerB <= 0 {
+                e.timerB = 9
+                for _ in 0..<2 { spawn(.sniper, at: jitter(e.pos, 200)) }
+                for _ in 0..<2 { spawn(.bomber, at: jitter(e.pos, 150)) }
+                state.flash("GENERAL GERM CALLS THE TROOPS!", seconds: 1.5)
+            }
+        default: break
+        }
+        return v
+    }
+
+    /// A ring of enemy shots.
+    private func ring(from p: CGPoint, count: Int, speed: Double, damage: Double, offset: Double = 0) {
+        for i in 0..<count {
+            let a = offset + Double(i) / Double(count) * 2 * .pi
+            fire(from: p, dir: CGVector(dx: cos(a), dy: sin(a)), speed: speed, damage: damage)
+        }
     }
 
     private func telegraphStomp(at p: CGPoint, radius: Double, then: @escaping () -> Void) {
@@ -499,10 +1027,94 @@ final class GameScene: SKScene {
         }, .group([.fadeOut(withDuration: 0.25), .scale(to: 1.15, duration: 0.25)]), .removeFromParent()]))
     }
 
-    private func fire(from p: CGPoint, dir: CGVector, speed: Double, damage: Double) {
+    private func fire(from p: CGPoint, dir: CGVector, speed: Double, damage: Double, tint: UIColor? = nil) {
         let n = SKSpriteNode(texture: tex("slime")); n.size = CGSize(width: 18, height: 18); n.position = p
+        var chill = false
+        if let s = shooter, s.variant != .normal {
+            n.color = s.baseTint; n.colorBlendFactor = 0.85
+            chill = s.variant == .frost
+        } else if let tint {
+            n.color = tint; n.colorBlendFactor = 0.85
+        }
         shotLayer.addChild(n)
-        shots.append(Shot(pos: p, vel: CGVector(dx: dir.dx * speed, dy: dir.dy * speed), damage: damage * state.organ.difficulty, life: 4, node: n))
+        shots.append(Shot(pos: p, vel: CGVector(dx: dir.dx * speed, dy: dir.dy * speed), damage: damage * state.organ.difficulty, life: 4, node: n, chill: chill))
+    }
+
+    /// Shows the enemy's resting colors again (frozen enemies stay icy blue).
+    private func restoreTint(_ e: Enemy) {
+        if e.slowT > 0 {
+            e.node.color = UIColor(red: 0.55, green: 0.85, blue: 1, alpha: 1); e.node.colorBlendFactor = 0.5
+        } else {
+            e.node.color = e.baseTint; e.node.colorBlendFactor = e.baseBlend
+        }
+    }
+
+    /// Extra moves from the boss's variant: Frost ice rings, Toxic puddles, Inferno fire rings,
+    /// Shadow invisibility, Mega backup.
+    private func variantAbility(_ e: Enemy, dt: Double) {
+        e.variantT -= dt
+        switch e.variant {
+        case .normal: break
+        case .frost:
+            if e.variantT <= 0 { e.variantT = 5; ring(from: e.pos, count: 10, speed: 130, damage: 7, offset: Double.random(in: 0..<1)) }
+        case .toxic:
+            if e.variantT <= 0 { e.variantT = 1.6; addPuddle(at: e.pos, radius: 62, life: 6) }
+        case .inferno:
+            if e.variantT <= 0 {
+                e.variantT = 3.8
+                for w in 0..<2 {
+                    run(.sequence([.wait(forDuration: 0.3 * Double(w)), .run { [weak self, weak e] in
+                        guard let self, let e, e.alive, !self.simPaused else { return }
+                        self.shooter = e; defer { self.shooter = nil }
+                        self.ring(from: e.pos, count: 16, speed: 165, damage: 9, offset: Double(w) * .pi / 16)
+                    }]))
+                }
+            }
+        case .shadow:
+            if e.variantT <= 0 {
+                e.cloaked.toggle()
+                e.variantT = e.cloaked ? 2.5 : 5
+                e.speed *= e.cloaked ? 1.4 : 1 / 1.4
+                e.node.run(.fadeAlpha(to: e.cloaked ? 0.1 : 1, duration: 0.3))
+                if e.cloaked { state.flash("THE SHADOW BOSS VANISHED!", seconds: 1.2) }
+            }
+        case .mega:
+            if !e.summoned, e.hp < e.maxHP * 0.5 {
+                e.summoned = true
+                state.flash("MEGA BOSS CALLS FOR BACKUP!", seconds: 2)
+                Sound.warning.play(); shake = 0.4
+                for _ in 0..<2 { spawn(.elite, at: jitter(e.pos, 130)) }
+            }
+        }
+    }
+
+    private func bomberBlast(_ e: Enemy) {
+        guard e.alive else { return }
+        let p = e.pos, r = 80.0
+        e.alive = false
+        explosion(at: p, radius: r, color: UIColor(red: 1, green: 0.45, blue: 0.15, alpha: 1))
+        Sound.bomb.play(volume: 0.5, minGap: 0.15)
+        shake = max(shake, 0.25)
+        if dist2(ppos, p) < pow(r + playerRadius, 2) { hurt(e.damage * 1.6) }
+        // The blast hurts nearby viruses too: lure bombers into a crowd.
+        each(near: p, radius: r + 30) { o in
+            if o !== e, !o.kind.isBoss, dist2(o.pos, p) < pow(r + o.radius, 2) {
+                self.damage(o, 30 * self.state.organ.difficulty, knock: norm(sub(o.pos, p)), kb: 220, quiet: true)
+            }
+        }
+        e.node.removeAllActions()
+        e.node.run(.sequence([.fadeOut(withDuration: 0.1), .removeFromParent()]))
+    }
+
+    private func healAround(_ e: Enemy) {
+        let r = 160.0
+        each(near: e.pos, radius: r) { o in
+            guard o !== e, !o.golden, o.hp < o.maxHP, dist2(o.pos, e.pos) < r * r else { return }
+            o.hp = min(o.maxHP, o.hp + o.maxHP * (o.kind.isBoss ? 0.03 : 0.3))
+        }
+        let ring = ringSprite(at: e.pos, radius: r, color: UIColor(red: 0.4, green: 1, blue: 0.55, alpha: 0.8), filled: true)
+        ring.zPosition = 2; ring.setScale(0.2)
+        addFX(ring, life: [.group([.scale(to: 1, duration: 0.45), .fadeOut(withDuration: 0.5)])])
     }
 
     // MARK: weapons
@@ -527,6 +1139,20 @@ final class GameScene: SKScene {
             n.addChild(core)
             world.addChild(n); shieldNodes.append(n)
         }
+        let blades = lo.level(.saw) > 0 ? WeaponStats.saw(lo.level(.saw)).blades : 0
+        while sawNodes.count < blades {
+            let n = SKSpriteNode(texture: tex("glow-gold")); n.size = CGSize(width: 44, height: 44); n.zPosition = 5; n.blendMode = .add
+            let path = CGMutablePath()
+            for k in 0..<16 {
+                let a = Double(k) / 16 * 2 * .pi, r: Double = k % 2 == 0 ? 17 : 9
+                let p = CGPoint(x: cos(a) * r, y: sin(a) * r)
+                if k == 0 { path.move(to: p) } else { path.addLine(to: p) }
+            }
+            path.closeSubpath()
+            let blade = SKShapeNode(path: path); blade.fillColor = UIColor(red: 1, green: 0.55, blue: 0.2, alpha: 1); blade.strokeColor = .white; blade.lineWidth = 1.5
+            n.addChild(blade)
+            world.addChild(n); sawNodes.append(n)
+        }
         fieldNode.isHidden = lo.level(.field) == 0
         if lo.level(.field) > 0 {
             let r = WeaponStats.field(lo.level(.field)).radius
@@ -550,6 +1176,7 @@ final class GameScene: SKScene {
                         let spread = (Double(i) - Double(w.bolts - 1) / 2) * 0.16
                         let a = atan2(dir.dy, dir.dx) + spread
                         let n = SKSpriteNode(texture: tex("bolt")); n.size = CGSize(width: 34, height: 14); n.zRotation = CGFloat(a)
+                        if lo.level(.laser) >= evolvedLevel { n.color = UIColor(red: 1, green: 0.85, blue: 0.3, alpha: 1); n.colorBlendFactor = 0.8; n.size = CGSize(width: 46, height: 18) }
                         n.position = ppos; shotLayer.addChild(n)
                         bolts.append(Bolt(pos: ppos, vel: CGVector(dx: cos(a) * 560, dy: sin(a) * 560), damage: w.damage * dm, pierce: w.pierce, life: 0.9, node: n))
                     }
@@ -634,6 +1261,81 @@ final class GameScene: SKScene {
                 } else { zapT = 0.2 }
             }
         }
+        // Freeze ray: a frost wave that chills (slows) and damages nearby viruses
+        if lo.level(.freeze) > 0 {
+            freezeT -= dt
+            if freezeT <= 0 {
+                let w = WeaponStats.freeze(lo.level(.freeze))
+                freezeT = w.cooldown * cd
+                each(near: ppos, radius: w.radius + 30) { e in
+                    if dist2(e.pos, self.ppos) < pow(w.radius + e.radius * 0.5, 2) {
+                        e.slowT = 2; e.slowAmt = w.slow
+                        self.damage(e, w.damage * dm, knock: .zero, kb: 0, quiet: true)
+                    }
+                }
+                let ring = ringSprite(at: ppos, radius: w.radius, color: UIColor(red: 0.6, green: 0.9, blue: 1, alpha: 0.9), filled: true)
+                ring.zPosition = 3; ring.setScale(0.3)
+                addFX(ring, essential: true, life: [.group([.scale(to: 1, duration: 0.25), .sequence([.wait(forDuration: 0.1), .fadeOut(withDuration: 0.3)])])])
+            }
+        }
+        // Homing missiles
+        if lo.level(.missile) > 0 {
+            missileT -= dt
+            if missileT <= 0 {
+                let w = WeaponStats.missile(lo.level(.missile))
+                if nearest(to: ppos, within: 450) != nil {
+                    missileT = w.cooldown * cd
+                    for i in 0..<w.count {
+                        let a = Double(i) / Double(w.count) * 2 * .pi + Double.random(in: 0...0.4)
+                        let n = SKSpriteNode(texture: tex("bolt")); n.size = CGSize(width: 26, height: 12)
+                        n.color = UIColor(red: 1, green: 0.55, blue: 0.2, alpha: 1); n.colorBlendFactor = 0.9
+                        n.position = ppos; shotLayer.addChild(n)
+                        bolts.append(Bolt(pos: ppos, vel: CGVector(dx: cos(a) * 260, dy: sin(a) * 260), damage: w.damage * dm, pierce: 0, life: 2.6, node: n, blast: w.blast))
+                    }
+                    Sound.shoot.play(volume: 0.4, minGap: 0.1)
+                } else { missileT = 0.2 }
+            }
+        }
+        // Plasma saw: blades spin around Nano the other way, wider than the shield
+        if lo.level(.saw) > 0 {
+            let w = WeaponStats.saw(lo.level(.saw))
+            sawAngle -= dt * 4.2
+            for (i, n) in sawNodes.enumerated() {
+                let a = sawAngle + Double(i) / Double(sawNodes.count) * 2 * .pi
+                let p = CGPoint(x: ppos.x + cos(a) * w.radius, y: ppos.y + sin(a) * w.radius)
+                n.position = p; n.zRotation += CGFloat(dt * 14)
+                each(near: p, radius: 50) { e in
+                    if e.sawHitCD <= 0, dist2(e.pos, p) < pow(e.radius + 18, 2) {
+                        e.sawHitCD = 0.35
+                        self.damage(e, w.damage * dm, knock: norm(sub(e.pos, self.ppos)), kb: 120, quiet: true)
+                    }
+                }
+            }
+        }
+        // Antibody rain: strikes land on random viruses near Nano
+        if lo.level(.rain) > 0 {
+            rainT -= dt
+            if rainT <= 0 {
+                let w = WeaponStats.rain(lo.level(.rain))
+                rainT = w.cooldown * cd
+                var targets: [CGPoint] = []
+                each(near: ppos, radius: 420) { e in if targets.count < w.strikes * 3 { targets.append(e.pos) } }
+                for p in targets.shuffled().prefix(w.strikes) {
+                    let mark = ringSprite(at: p, radius: w.radius, color: UIColor(red: 0.5, green: 1, blue: 0.8, alpha: 0.8))
+                    mark.zPosition = 3; mark.setScale(0.3)
+                    fxAlive += 1
+                    fxLayer.addChild(mark)
+                    mark.run(.sequence([.scale(to: 1, duration: 0.3), .run { [weak self] in
+                        self?.fxAlive -= 1
+                        guard let self, !self.simPaused else { return }
+                        self.each(near: p, radius: w.radius + 30) { e in
+                            if dist2(e.pos, p) < pow(w.radius + e.radius, 2) { self.damage(e, w.damage * dm, knock: norm(sub(e.pos, p)), kb: 140, quiet: true) }
+                        }
+                        self.explosion(at: p, radius: w.radius, color: UIColor(red: 0.5, green: 1, blue: 0.8, alpha: 1))
+                    }, .removeFromParent()]))
+                }
+            }
+        }
         // Cure bomb
         if lo.level(.bomb) > 0 {
             bombT -= dt
@@ -662,12 +1364,23 @@ final class GameScene: SKScene {
         }
         let s = SKShapeNode(path: path)
         s.strokeColor = UIColor(red: 0.75, green: 0.95, blue: 1, alpha: 1); s.lineWidth = 4; s.blendMode = .add
-        fxLayer.addChild(s)
-        s.run(.sequence([.fadeOut(withDuration: 0.18), .removeFromParent()]))
+        addFX(s, essential: true, life: [.fadeOut(withDuration: 0.18)])
     }
 
     private func moveBolts(_ dt: Double) {
         for i in bolts.indices.reversed() {
+            if bolts[i].blast > 0 {
+                // Steer toward the nearest virus and speed up.
+                if let t = nearest(to: bolts[i].pos, within: 360) {
+                    let want = norm(sub(t.pos, bolts[i].pos))
+                    let sp = min(620, len(bolts[i].vel) + 900 * dt)
+                    let cur = norm(bolts[i].vel)
+                    let k = min(1, 7 * dt)
+                    let dir = norm(CGVector(dx: cur.dx + (want.dx - cur.dx) * k, dy: cur.dy + (want.dy - cur.dy) * k))
+                    bolts[i].vel = CGVector(dx: dir.dx * sp, dy: dir.dy * sp)
+                }
+                bolts[i].node.zRotation = atan2(bolts[i].vel.dy, bolts[i].vel.dx)
+            }
             bolts[i].pos.x += bolts[i].vel.dx * dt
             bolts[i].pos.y += bolts[i].vel.dy * dt
             bolts[i].life -= dt
@@ -682,6 +1395,13 @@ final class GameScene: SKScene {
                 if let e = hitE {
                     bolts[i].hit.insert(ObjectIdentifier(e))
                     damage(e, bolts[i].damage, knock: norm(bolts[i].vel), kb: 90)
+                    if bolts[i].blast > 0 {
+                        let r = bolts[i].blast, dmg = bolts[i].damage * 0.6
+                        each(near: p, radius: r + 30) { o in
+                            if o !== e, dist2(o.pos, p) < pow(r + o.radius, 2) { self.damage(o, dmg, knock: norm(sub(o.pos, p)), kb: 120, quiet: true) }
+                        }
+                        explosion(at: p, radius: r, color: UIColor(red: 1, green: 0.55, blue: 0.2, alpha: 1))
+                    }
                     if bolts[i].pierce <= 0 { dead = true } else { bolts[i].pierce -= 1 }
                 }
             }
@@ -696,7 +1416,10 @@ final class GameScene: SKScene {
             shots[i].life -= dt
             shots[i].node.position = shots[i].pos
             var dead = shots[i].life <= 0
-            if !dead, dist2(shots[i].pos, ppos) < pow(playerRadius + 8, 2) { hurt(shots[i].damage); dead = true }
+            if !dead, dist2(shots[i].pos, ppos) < pow(playerRadius + 8, 2) {
+                if shots[i].chill { chilled = 1.6 }
+                hurt(shots[i].damage); dead = true
+            }
             if dead { shots[i].node.removeFromParent(); shots.remove(at: i) }
         }
     }
@@ -722,11 +1445,9 @@ final class GameScene: SKScene {
         let g = SKSpriteNode(texture: tex("glow-pink")); g.position = p
         g.size = CGSize(width: radius * 2.2, height: radius * 2.2); g.setScale(0.3); g.alpha = 0.95
         g.blendMode = .add
-        fxLayer.addChild(g)
-        g.run(.sequence([.group([.scale(to: 1, duration: 0.22), .fadeOut(withDuration: 0.35)]), .removeFromParent()]))
-        let ring = SKShapeNode(circleOfRadius: CGFloat(radius)); ring.position = p; ring.strokeColor = color; ring.lineWidth = 6; ring.blendMode = .add; ring.setScale(0.4)
-        fxLayer.addChild(ring)
-        ring.run(.sequence([.group([.scale(to: 1, duration: 0.25), .fadeOut(withDuration: 0.3)]), .removeFromParent()]))
+        addFX(g, life: [.group([.scale(to: 1, duration: 0.22), .fadeOut(withDuration: 0.35)])])
+        let ring = ringSprite(at: p, radius: radius, color: color); ring.setScale(0.4)
+        addFX(ring, life: [.group([.scale(to: 1, duration: 0.25), .fadeOut(withDuration: 0.3)])])
     }
 
     // MARK: damage
@@ -734,11 +1455,12 @@ final class GameScene: SKScene {
     private func damage(_ e: Enemy, _ amount: Double, knock: CGVector, kb: Double, quiet: Bool = false) {
         guard e.alive else { return }
         let crit = Double.random(in: 0..<1) < 0.08
-        let a = amount * (crit ? 2 : 1)
+        var a = amount * (crit ? 2 : 1)
+        if e.armorT > 0 { a *= 0.1 }
         e.hp -= a
         e.flash = 0.07
         e.node.color = .white
-        if !e.kind.isBoss { let m = e.kind == .elite ? 0.3 : 1; e.knock.dx += knock.dx * kb * m; e.knock.dy += knock.dy * kb * m }
+        if !e.kind.isBoss { let m = e.kind == .elite ? 0.3 : e.kind.isMiniBoss ? 0.12 : 1; e.knock.dx += knock.dx * kb * m; e.knock.dy += knock.dy * kb * m }
         popNumber(a, at: e.pos, crit: crit)
         if !quiet { Sound.hit.play(volume: 0.35, minGap: 0.05) }
         if e.hp <= 0 { kill(e) }
@@ -746,18 +1468,56 @@ final class GameScene: SKScene {
 
     private func kill(_ e: Enemy) {
         e.alive = false
+        e.aux?.removeFromParent(); e.aux = nil
+        if !bossDefeated { countCombo() } // the cure wave at the end doesn't count
         kills += 1
         burst(at: e.pos, kind: e.kind)
         Sound.kill.play(volume: 0.45, minGap: 0.06)
         // drops
         let xpValue = e.xp
-        if e.kind.isBoss {
+        if e.golden {
+            goldenKills += 1
+            for _ in 0..<10 { drop(.coin(3), at: jitter(e.pos, 50)) }
+            state.flash("GOLDEN VIRUS CAUGHT! +30 coins")
+            Haptics.success()
+        }
+        if mutation == .splitters, !e.kind.isBoss, e.kind != .mini, e.kind != .blob, !e.golden {
+            for _ in 0..<2 { spawn(.mini, at: jitter(e.pos, 14)) }
+        }
+        if e.kind.dnaDrop > 0 {
+            dnaEarned += e.kind.dnaDrop
+            popLabel("+\(e.kind.dnaDrop) BOSS DNA", color: UIColor(red: 0.5, green: 1, blue: 0.8, alpha: 1))
+        }
+        if e === nemesisEnemy {
+            // Swept away by the end-of-run cure wave doesn't count as revenge.
+            if !bossDefeated {
+                nemesisBeaten = true
+                for _ in 0..<10 { drop(.coin(3), at: jitter(e.pos, 60)) }
+                drop(.chest, at: e.pos)
+                knockout(at: e.pos)
+                state.flash("REVENGE! NEMESIS DOWN", seconds: 2)
+            }
+        } else if e.kind.isBoss {
+            bossKills += 1
             for _ in 0..<14 { drop(.coin(3), at: jitter(e.pos, 70)) }
             drop(.chest, at: e.pos)
             for _ in 0..<10 { drop(.xp(5), at: jitter(e.pos, 80)) }
             shake = 0.6
             Haptics.success()
-            if !state.organ.isEndless { bossDefeated = true; winSequence() } else { state.flash("BOSS DOWN! +\(14 * 3) coins") }
+            knockout(at: e.pos)
+            let otherBoss = enemies.first { $0.alive && $0.kind.isBoss && $0 !== e && $0 !== self.nemesisEnemy }
+            if state.organ.isBossRush, rushIndex < BossRush.bosses - 1 {
+                rushIndex += 1; boss = nil; nextBoss = time + 3
+                state.flash("BOSS \(rushIndex)/\(BossRush.bosses) DOWN! NEXT ONE...", seconds: 2)
+            } else if !state.organ.isEndless, let o = otherBoss { boss = o; state.flash("ONE DOWN, ONE TO GO!") }
+            else if !state.organ.isEndless { bossDefeated = true; winSequence() } else { state.flash("BOSS DOWN! +\(14 * 3) coins") }
+        } else if e.kind.isMiniBoss {
+            drop(.chest, at: e.pos)
+            for _ in 0..<8 { drop(.coin(2), at: jitter(e.pos, 50)) }
+            for _ in 0..<5 { drop(.xp(5), at: jitter(e.pos, 60)) }
+            if e.kind == .miniQueen { for _ in 0..<4 { spawn(.spiky, at: jitter(e.pos, 40)) } }
+            shake = 0.4; Haptics.success()
+            state.flash("MINI BOSS DOWN! +16 coins")
         } else if e.kind == .elite {
             drop(.chest, at: e.pos)
             drop(.xp(xpValue), at: e.pos)
@@ -778,33 +1538,49 @@ final class GameScene: SKScene {
     private func burst(at p: CGPoint, kind: EnemyKind) {
         let color: UIColor
         switch kind {
+        case .bossBrain: color = UIColor(red: 1, green: 0.55, blue: 0.8, alpha: 1)
+        case .bossMarrow: color = UIColor(red: 0.95, green: 0.92, blue: 0.85, alpha: 1)
+        case .bossVex: color = UIColor(red: 0.75, green: 0.3, blue: 1, alpha: 1)
         case .spiky, .bossCowboy: color = UIColor(red: 0.55, green: 1, blue: 0.3, alpha: 1)
         case .blob, .bossSumo: color = UIColor(red: 0.8, green: 0.5, blue: 1, alpha: 1)
         case .dart: color = UIColor(red: 1, green: 0.6, blue: 0.2, alpha: 1)
         case .spitter: color = UIColor(red: 1, green: 0.95, blue: 0.3, alpha: 1)
         case .mini: color = UIColor(red: 1, green: 0.35, blue: 0.5, alpha: 1)
         case .elite, .bossRoyal: color = UIColor(red: 0.4, green: 0.9, blue: 1, alpha: 1)
+        case .bomber: color = UIColor(red: 1, green: 0.45, blue: 0.15, alpha: 1)
+        case .healer: color = UIColor(red: 0.4, green: 1, blue: 0.55, alpha: 1)
+        case .sniper: color = UIColor(red: 1, green: 0.25, blue: 0.3, alpha: 1)
+        case .spore: color = UIColor(red: 0.85, green: 0.75, blue: 1, alpha: 1)
+        case .miniQueen: color = UIColor(red: 1, green: 0.4, blue: 0.85, alpha: 1)
+        case .miniTurret: color = UIColor(red: 0.7, green: 0.75, blue: 0.85, alpha: 1)
+        case .miniRhino: color = UIColor(red: 0.85, green: 0.6, blue: 0.3, alpha: 1)
+        case .miniMagnet: color = UIColor(red: 1, green: 0.3, blue: 0.3, alpha: 1)
+        case .bossVira: color = UIColor(red: 1, green: 0.4, blue: 0.85, alpha: 1)
+        case .bossSultan: color = UIColor(red: 1, green: 0.75, blue: 0.3, alpha: 1)
+        case .bossBaron: color = UIColor(red: 0.5, green: 0.8, blue: 0.4, alpha: 1)
+        case .bossGeneral: color = UIColor(red: 0.7, green: 0.75, blue: 0.3, alpha: 1)
         }
         // Skip sparks when the screen is already busy; a mass of kills would otherwise add hundreds of nodes.
-        let busy = fxLayer.children.count > 140
+        let busy = fxAlive > 100
         if busy && !kind.isBoss { return }
         let count = kind.isBoss ? 18 : 3
         for _ in 0..<count {
             let g = SKSpriteNode(texture: tex("glow")); g.color = color; g.colorBlendFactor = 1; g.blendMode = .add
             let s = CGFloat.random(in: 10...22) * (kind.isBoss ? 2.5 : 1)
             g.size = CGSize(width: s, height: s); g.position = p
-            fxLayer.addChild(g)
             let a = Double.random(in: 0..<(2 * .pi)); let d = Double.random(in: 20...55) * (kind.isBoss ? 3 : 1)
-            g.run(.sequence([.group([.moveBy(x: cos(a) * d, y: sin(a) * d, duration: 0.35), .fadeOut(withDuration: 0.35), .scale(to: 0.3, duration: 0.35)]), .removeFromParent()]))
+            addFX(g, essential: kind.isBoss, life: [.group([.moveBy(x: cos(a) * d, y: sin(a) * d, duration: 0.35), .fadeOut(withDuration: 0.35), .scale(to: 0.3, duration: 0.35)])])
         }
     }
 
     private func popNumber(_ v: Double, at p: CGPoint, crit: Bool) {
+        guard numberBudget > 0, numbersAlive < 28 else { return }
+        numberBudget -= 1
+        numbersAlive += 1
         let l: SKLabelNode
         if let r = labelPool.popLast() { l = r } else {
             l = SKLabelNode(fontNamed: "AvenirNext-Heavy"); l.zPosition = 20
         }
-        guard fxLayer.children.count < 160 else { labelPool.append(l); return }
         l.removeAllActions(); l.alpha = 1; l.setScale(1)
         l.text = "\(Int(v.rounded()))"
         l.fontSize = crit ? 20 : 14
@@ -812,12 +1588,56 @@ final class GameScene: SKScene {
         l.position = CGPoint(x: p.x + CGFloat.random(in: -6...6), y: p.y + 14)
         fxLayer.addChild(l)
         l.run(.sequence([.group([.moveBy(x: 0, y: 26, duration: 0.5), .sequence([.wait(forDuration: 0.25), .fadeOut(withDuration: 0.25)])]),
-                         .run { [weak self, weak l] in guard let l else { return }; l.removeFromParent(); self?.labelPool.append(l) }]))
+                         .run { [weak self, weak l] in
+                             guard let self, let l else { return }
+                             l.removeFromParent(); self.labelPool.append(l); self.numbersAlive -= 1
+                         }]))
+    }
+
+    /// A ring effect as a sprite (one cached texture) instead of an SKShapeNode, which costs a
+    /// tessellation and its own draw call every time.
+    private func ringSprite(at p: CGPoint, radius: Double, color: UIColor, filled: Bool = false) -> SKSpriteNode {
+        let tex: SKTexture
+        if let t = GameScene.ringTextures[filled] { tex = t } else {
+            let r: CGFloat = 64, pad: CGFloat = 4
+            let img = UIGraphicsImageRenderer(size: CGSize(width: r * 2 + pad * 2, height: r * 2 + pad * 2)).image { _ in
+                let path = UIBezierPath(ovalIn: CGRect(x: pad, y: pad, width: r * 2, height: r * 2))
+                if filled { UIColor(white: 1, alpha: 0.14).setFill(); path.fill() }
+                UIColor.white.setStroke(); path.lineWidth = 5; path.stroke()
+            }
+            tex = SKTexture(image: img)
+            GameScene.ringTextures[filled] = tex
+        }
+        let s = SKSpriteNode(texture: tex)
+        let d = CGFloat(radius) * 2 * (136 / 128)
+        s.size = CGSize(width: d, height: d)
+        s.position = p
+        s.color = color; s.colorBlendFactor = 1; s.alpha = color.cgColor.alpha
+        s.blendMode = .add
+        return s
+    }
+
+    /// Adds a short-lived effect node, skipping it when the screen already has plenty.
+    @discardableResult
+    private func addFX(_ n: SKNode, essential: Bool = false, life: [SKAction]) -> Bool {
+        guard essential || fxAlive < 120 else { return false }
+        fxAlive += 1
+        fxLayer.addChild(n)
+        n.run(.sequence(life + [.run { [weak self] in self?.fxAlive -= 1 }, .removeFromParent()]))
+        return true
     }
 
     private func hurt(_ amount: Double) {
         guard invuln <= 0, !over else { return }
+        if bubbleUp {
+            // Bloop's bubble takes the hit.
+            bubbleUp = false; invuln = 0.6
+            if let b = bubbleNode { bubbleNode = nil; b.run(.sequence([.group([.scale(to: 1.6, duration: 0.2), .fadeOut(withDuration: 0.2)]), .removeFromParent()])) }
+            Sound.coin.play(volume: 0.5)
+            return
+        }
         invuln = 0.6
+        lastHit = time
         if !god { hp -= amount * (1 - stats.armor) }
         player.run(.sequence([.colorize(with: .red, colorBlendFactor: 0.8, duration: 0.05), .colorize(withColorBlendFactor: 0, duration: 0.25)]))
         player.texture = tex(skin.texture(.hurt))
@@ -838,22 +1658,27 @@ final class GameScene: SKScene {
     // MARK: pickups & levels
 
     private func drop(_ kind: PickupKind, at p: CGPoint) {
-        let name: String; var s: CGFloat
+        var name: String; var s: CGFloat
         switch kind {
         case .xp(let v): name = v >= 5 ? "orb-big" : "orb"; s = v >= 5 ? 22 : 15
         case .coin: name = "coin"; s = 20
         case .heart: name = "heart"; s = 24
         case .chest: name = "chest"; s = 40
         }
-        if pickups.count > 320, case .xp = kind {
-            // Merge into the oldest orb so the screen stays readable.
-            if let i = pickups.firstIndex(where: { if case .xp = $0.kind { return true } else { return false } }) {
-                if case .xp(let old) = pickups[i].kind, case .xp(let add) = kind {
-                    let n = pickups[i].node
-                    pickups[i] = Pickup(kind: .xp(old + add), pos: pickups[i].pos, node: n)
-                    n.texture = tex("orb-big"); n.size = CGSize(width: 22, height: 22)
-                }
-                return
+        var kind = kind
+        if pickups.count > 320, case .xp(let add) = kind {
+            // Too many orbs on the field: recycle the XP orb farthest from the player into this new drop,
+            // so its value moves to where the fight is. (Merging into the oldest orb used to bury all new
+            // DNA in orbs left far behind, which made long Endless runs stop leveling up.)
+            var far = -1, farD = -1.0
+            for i in pickups.indices where !pickups[i].pulled {
+                if case .xp = pickups[i].kind { let d = dist2(pickups[i].pos, ppos); if d > farD { farD = d; far = i } }
+            }
+            if far >= 0, case .xp(let old) = pickups[far].kind {
+                pickups[far].node.removeFromParent()
+                pickups.remove(at: far)
+                kind = .xp(old + add)
+                name = "orb-big"; s = 22
             }
         }
         let n = SKSpriteNode(texture: tex(name)); n.size = CGSize(width: s, height: s); n.position = p
@@ -895,6 +1720,7 @@ final class GameScene: SKScene {
             hp = min(stats.maxHP, hp + 30); Sound.coin.play(volume: 0.5)
             popLabel("+30", color: UIColor(red: 0.4, green: 1, blue: 0.55, alpha: 1))
         case .chest:
+            chestsOpened += 1
             Haptics.success()
             showLevelUp(fromChest: true)
         }
@@ -927,6 +1753,10 @@ final class GameScene: SKScene {
         case .coins(let n): coinsCollected += n
         default: state.loadout.apply(o)
         }
+        if case .weapon(let w, let l) = o, l >= evolvedLevel {
+            state.flash("EVOLVED: \(w.evolvedTitle.uppercased())!", seconds: 2.5)
+            Haptics.success()
+        }
         rebuildWeapons()
         Sound.tap.play()
         if case .levelUp(_, fromChest: let chest) = state.phase, !chest { pendingLevels = max(0, pendingLevels - 1) }
@@ -956,11 +1786,12 @@ final class GameScene: SKScene {
         guard !over, case .dead(canRevive: true) = state.phase else { return }
         state.revivesUsed += 1
         hp = stats.maxHP
+        if mode == .defense { bedHP = max(bedHP, 50) }
         invuln = 2.5
         player.texture = tex(skin.texture(.fight))
         player.run(.repeat(.sequence([.fadeAlpha(to: 0.3, duration: 0.12), .fadeAlpha(to: 1, duration: 0.12)]), count: 9))
         // Clear the area around the player.
-        each(near: ppos, radius: 260) { e in if !e.kind.isBoss { self.kill(e) } }
+        each(near: ppos, radius: 260) { e in if !e.kind.isBoss, !e.kind.isMiniBoss { self.kill(e) } }
         explosion(at: ppos, radius: 260, color: UIColor(red: 0.45, green: 0.95, blue: 1, alpha: 1))
         simPaused = false
         state.phase = .playing
@@ -989,7 +1820,8 @@ final class GameScene: SKScene {
     /// Debug/UI-test helper: start the run later in the timeline (e.g. right before the boss).
     func fastForward(to t: Double) {
         time = t
-        nextElite = (floor(t / 60) + 1) * 60
+        let iv = eliteInterval
+        nextElite = (floor(t / iv) + 1) * iv
     }
 
     /// Called by the HUD when the player gives up after dying.
@@ -1000,7 +1832,215 @@ final class GameScene: SKScene {
         }
     }
 
-    var result: (coins: Int, kills: Int, time: Double, level: Int) { (coinsCollected, kills, time, level) }
+    var result: (coins: Int, kills: Int, time: Double, level: Int, bosses: Int, golden: Int, combo: Int) { (coinsCollected, kills, time, level, bossKills, goldenKills, bestCombo) }
+
+    private var eliteInterval: Double { mutation.eliteInterval ?? state.organ.eliteInterval }
+
+    // MARK: city mutations & events
+
+    /// Golden Virus, supply drops and King Vex's ambush keep runs from feeling the same.
+    private func events() {
+        if time >= nextGolden {
+            nextGolden = time + Double.random(in: 70...120)
+            if boss == nil {
+                let a = Double.random(in: 0..<(2 * .pi))
+                let e = spawn(.spiky, at: CGPoint(x: ppos.x + cos(a) * 260, y: ppos.y + sin(a) * 260))
+                e.golden = true; e.timerC = 15
+                e.hp = 25 * state.organ.difficulty; e.node.alpha = 1
+                e.baseTint = UIColor(red: 1, green: 0.82, blue: 0.2, alpha: 1); e.baseBlend = 0.75; restoreTint(e)
+                e.node.run(.repeatForever(.sequence([.scale(to: 1.25, duration: 0.3), .scale(to: 1, duration: 0.3)])))
+                state.flash("✨ A GOLDEN VIRUS! CATCH IT!", seconds: 2.5)
+                Sound.coin.play()
+            }
+        }
+        if time >= nextSupply {
+            nextSupply = time + Double.random(in: 80...130)
+            let a = Double.random(in: 0..<(2 * .pi))
+            drop(.chest, at: CGPoint(x: ppos.x + cos(a) * 230, y: ppos.y + sin(a) * 230))
+            state.flash("📦 SUPPLY DROP NEARBY!")
+        }
+        if !state.organ.isEndless, state.organ.infection >= 3, ambushEnds == nil, time >= ambushAt, boss == nil {
+            ambushEnds = time + 20
+            state.flash("👑 KING VEX AMBUSH! SURVIVE 20 SECONDS", seconds: 3)
+            Sound.warning.play(); Haptics.medium(); shake = 0.4
+            for i in 0..<14 {
+                let a = Double(i) / 14 * 2 * .pi
+                spawn(.dart, at: CGPoint(x: ppos.x + cos(a) * 320, y: ppos.y + sin(a) * 320))
+            }
+            spawn(.elite, at: CGPoint(x: ppos.x, y: ppos.y + 340))
+        }
+        if let end = ambushEnds, end > 0, time >= end {
+            ambushEnds = -1
+            coinsCollected += 40
+            state.flash("AMBUSH SURVIVED! +40 coins")
+            Haptics.success()
+        }
+    }
+
+    /// Toxic Ground: puddles appear near Nano, arm after a short warning, and hurt while standing in them.
+    private func updatePuddles(_ dt: Double) {
+        if mutation == .toxic, !bossDefeated {
+            nextPuddle -= dt
+            if nextPuddle <= 0 {
+                nextPuddle = 3.2
+                addPuddle(at: CGPoint(x: ppos.x + CGFloat.random(in: -140...140), y: ppos.y + CGFloat.random(in: -140...140)), radius: 70, life: 7)
+            }
+        }
+        for i in puddles.indices.reversed() {
+            puddles[i].life -= dt
+            if puddles[i].armed > 0 {
+                puddles[i].armed -= dt
+                if puddles[i].armed <= 0 { puddles[i].node.fillColor = UIColor(red: 0.45, green: 0.95, blue: 0.1, alpha: 0.35) }
+            } else if !bossDefeated, dist2(puddles[i].pos, ppos) < pow(puddles[i].radius - 4, 2) {
+                hurt(7 * (0.85 + 0.15 * state.organ.difficulty))
+            }
+            if puddles[i].life <= 0 {
+                puddles[i].node.run(.sequence([.fadeOut(withDuration: 0.3), .removeFromParent()]))
+                puddles.remove(at: i)
+            }
+        }
+    }
+
+    private func addPuddle(at p: CGPoint, radius: Double, life: Double) {
+        let n = SKShapeNode(circleOfRadius: CGFloat(radius))
+        n.position = p; n.zPosition = 0.5; n.lineWidth = 3
+        n.strokeColor = UIColor(red: 0.6, green: 1, blue: 0.2, alpha: 0.8)
+        n.fillColor = UIColor(red: 0.45, green: 0.95, blue: 0.1, alpha: 0.12)
+        n.setScale(0.2)
+        n.run(.scale(to: 1, duration: 0.8))
+        world.addChild(n)
+        puddles.append(Puddle(pos: p, life: life, armed: 0.8, node: n, radius: radius))
+    }
+
+    /// Each organ has its own danger, so every stage plays differently:
+    /// Lungs gusts of wind, Heart heartbeats that make viruses sprint, Stomach acid rain,
+    /// Brain neuron beams, Bone Marrow bone spikes.
+    private func updateHazards(_ dt: Double) {
+        if windLeft > 0 { windLeft -= dt; if windLeft <= 0 { wind = .zero } }
+        if rush > 0 { rush -= dt }
+        guard !state.organ.isEndless, !bossDefeated else { return }
+        nextHazard -= dt
+        guard nextHazard <= 0 else { return }
+        switch state.organ.id {
+        case 1:
+            nextHazard = 10
+            let a = Double.random(in: 0..<(2 * .pi))
+            let dir = CGVector(dx: cos(a), dy: sin(a))
+            let arrows = ["→", "↗", "↑", "↖", "←", "↙", "↓", "↘"]
+            let idx = Int(((a / (2 * .pi)) * 8).rounded()) % 8
+            state.flash("💨 WIND GUST \(arrows[idx])", seconds: 1.5)
+            run(.sequence([.wait(forDuration: 1), .run { [weak self] in
+                self?.wind = CGVector(dx: dir.dx * 120, dy: dir.dy * 120); self?.windLeft = 2.5
+            }]))
+        case 2:
+            nextHazard = 7
+            rush = 1.1
+            shake = max(shake, 0.25)
+            Haptics.medium()
+            let ring = SKShapeNode(circleOfRadius: 40)
+            ring.position = ppos; ring.strokeColor = UIColor(red: 1, green: 0.25, blue: 0.35, alpha: 0.8); ring.lineWidth = 6; ring.zPosition = 6
+            world.addChild(ring)
+            ring.run(.sequence([.group([.scale(to: 9, duration: 0.6), .fadeOut(withDuration: 0.6)]), .removeFromParent()]))
+            Sound.stomp.play(volume: 0.5)
+        case 3:
+            nextHazard = 8
+            for _ in 0..<4 {
+                let p = CGPoint(x: ppos.x + CGFloat.random(in: -170...170), y: ppos.y + CGFloat.random(in: -170...170))
+                telegraphStomp(at: p, radius: 60) { [weak self] in
+                    guard let self else { return }
+                    if dist2(self.ppos, p) < 60 * 60 { self.hurt(10 * (0.85 + 0.15 * self.state.organ.difficulty)) }
+                }
+            }
+        case 4:
+            nextHazard = 9
+            let a = Double.random(in: 0..<(.pi))
+            let dir = CGVector(dx: cos(a), dy: sin(a))
+            let c = CGPoint(x: ppos.x + CGFloat.random(in: -60...60), y: ppos.y + CGFloat.random(in: -60...60))
+            let L: CGFloat = 1400
+            let path = CGMutablePath()
+            path.move(to: CGPoint(x: c.x - dir.dx * L, y: c.y - dir.dy * L))
+            path.addLine(to: CGPoint(x: c.x + dir.dx * L, y: c.y + dir.dy * L))
+            let beam = SKShapeNode(path: path)
+            beam.strokeColor = UIColor(red: 0.85, green: 0.4, blue: 1, alpha: 0.35); beam.lineWidth = 3; beam.zPosition = 6
+            world.addChild(beam)
+            beam.run(.sequence([.wait(forDuration: 1.0), .run { [weak self] in
+                guard let self else { return }
+                beam.strokeColor = UIColor(red: 1, green: 0.7, blue: 1, alpha: 0.95); beam.lineWidth = 22; beam.blendMode = .add
+                // Distance from Nano to the beam line.
+                let vx = Double(self.ppos.x - c.x), vy = Double(self.ppos.y - c.y)
+                if abs(vx * Double(dir.dy) - vy * Double(dir.dx)) < 28 { self.hurt(14 * (0.85 + 0.15 * self.state.organ.difficulty)) }
+                Sound.zap.play()
+            }, .fadeOut(withDuration: 0.3), .removeFromParent()]))
+        default:
+            nextHazard = 7
+            let ang = Double.random(in: 0..<(2 * .pi))
+            let toward = CGVector(dx: cos(ang), dy: sin(ang))
+            let start = CGPoint(x: ppos.x - toward.dx * 220, y: ppos.y - toward.dy * 220)
+            for i in 0..<6 {
+                let p = CGPoint(x: start.x + toward.dx * CGFloat(i) * 80, y: start.y + toward.dy * CGFloat(i) * 80)
+                run(.sequence([.wait(forDuration: 0.12 * Double(i)), .run { [weak self] in
+                    self?.telegraphStomp(at: p, radius: 50) { [weak self] in
+                        guard let self else { return }
+                        if dist2(self.ppos, p) < 50 * 50 { self.hurt(11 * (0.85 + 0.15 * self.state.organ.difficulty)) }
+                    }
+                }]))
+            }
+        }
+    }
+
+    private func pickObjective() {
+        guard !state.organ.isSideMode, !rookie, mode == .normal else { return }
+        objective = [.noHit, .kills, .fastBoss, .chests].randomElement()
+        updateObjective()
+    }
+
+    /// Bonus objective: +60 coins when done.
+    private func updateObjective() {
+        guard let o = objective, !objectiveDone else { return }
+        let text: String
+        var done = false
+        switch o {
+        case .noHit:
+            let clean = Int(time - lastHit)
+            done = clean >= 45
+            text = "Bonus: no damage for 45s (\(min(45, clean))s)"
+        case .kills:
+            done = kills >= 250 && time <= 180
+            text = time > 180 && !done ? "Bonus failed: 250 kills by 3:00" : "Bonus: 250 kills by 3:00 (\(min(250, kills)))"
+            if time > 180 && !done { state.objective = text; objective = nil; return }
+        case .fastBoss:
+            if let t0 = bossSpawnedAt, bossKills > 0 || bossDefeated { done = time - t0 <= 45 }
+            if let t0 = bossSpawnedAt, time - t0 > 45, !done { state.objective = "Bonus failed: boss in 45s"; objective = nil; return }
+            text = bossSpawnedAt.map { "Bonus: beat the boss in 45s (\(max(0, 45 - Int(time - $0)))s)" } ?? "Bonus: beat the boss within 45s"
+        case .chests:
+            done = chestsOpened >= 3
+            text = "Bonus: open 3 chests (\(min(3, chestsOpened)))"
+        }
+        if state.objective != text { state.objective = text }
+        if done {
+            objectiveDone = true
+            coinsCollected += 60
+            state.objective = "Bonus complete! +60 coins"
+            state.objectiveDone = true
+            state.flash("🎯 BONUS COMPLETE! +60 coins")
+            Haptics.success(); Sound.coin.play()
+        }
+    }
+
+    /// Blackout: a dark overlay with a circle of light around Nano.
+    private func setupDarkness() {
+        guard mutation == .darkness else { return }
+        let side = max(size.width, size.height) * 2.4
+        let img = UIGraphicsImageRenderer(size: CGSize(width: 512, height: 512)).image { ctx in
+            let colors = [UIColor(white: 0, alpha: 0).cgColor, UIColor(white: 0, alpha: 0.55).cgColor, UIColor(white: 0, alpha: 0.93).cgColor] as CFArray
+            let g = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: colors, locations: [0, 0.16, 0.3])!
+            ctx.cgContext.drawRadialGradient(g, startCenter: CGPoint(x: 256, y: 256), startRadius: 0, endCenter: CGPoint(x: 256, y: 256), endRadius: 256, options: .drawsAfterEndLocation)
+        }
+        let n = SKSpriteNode(texture: SKTexture(image: img), size: CGSize(width: side, height: side))
+        n.zPosition = 50
+        cam.addChild(n)
+        darkness = n
+    }
 
     // MARK: render & HUD
 
@@ -1014,14 +2054,20 @@ final class GameScene: SKScene {
         hpBar.position = CGPoint(x: ppos.x, y: ppos.y - 38)
         hpFill.size.width = 44 * CGFloat(max(0, hp / stats.maxHP))
         hpFill.color = hp / stats.maxHP < 0.3 ? UIColor(red: 1, green: 0.3, blue: 0.35, alpha: 1) : UIColor(red: 0.3, green: 0.95, blue: 0.55, alpha: 1)
+        let ghosts = mutation == .ghosts
         for e in enemies where e.alive {
             e.node.position = e.pos
+            if ghosts, !e.kind.isBoss, !e.golden {
+                let d = sqrt(dist2(e.pos, ppos))
+                e.node.alpha = CGFloat(d < 140 ? 1 : d > 260 ? 0.07 : 1 - (d - 140) / 120 * 0.93)
+            }
             let ph = time + e.wobblePhase
             if e.kind == .dart {
                 e.node.zRotation = CGFloat(ph * 2.4) // dash pop scale stays an action
             } else if !e.kind.isBoss {
                 e.node.zRotation = e.wobbleAngle * CGFloat(sin(ph * .pi / 1.2))
-                if e.kind != .mini { e.node.setScale(CGFloat(1.01 + 0.05 * sin(ph * .pi / 0.9))) }
+                if e.kind == .bomber, e.phase == 1 { e.node.setScale(CGFloat(1.15 + 0.15 * sin(time * 40))) }
+                else if e.kind != .mini { e.node.setScale(CGFloat(1.01 + 0.05 * sin(ph * .pi / 0.9))) }
             }
         }
         var cp = ppos
@@ -1030,6 +2076,16 @@ final class GameScene: SKScene {
             let k = CGFloat(min(1, shake * 3)); cp.x += CGFloat.random(in: -6...6) * k; cp.y += CGFloat.random(in: -6...6) * k
         }
         cam.position = cp
+        allyNode.position = allyPos
+        if mode == .escape { pointArrow() }
+        let half = CGPoint(x: size.width / 2 + 120, y: size.height / 2 + 120)
+        for p in parallax {
+            // Drifts slower than the camera, wrapping around the screen.
+            let w = half.x * 2, h = half.y * 2
+            var x = (p.base.x - ppos.x * p.depth + CGFloat(time) * 6).truncatingRemainder(dividingBy: w); if x < 0 { x += w }
+            var y = (p.base.y - ppos.y * p.depth + CGFloat(time) * 4).truncatingRemainder(dividingBy: h); if y < 0 { y += h }
+            p.node.position = CGPoint(x: x - half.x, y: y - half.y)
+        }
         // background tiles follow the camera in a 3×3 grid
         let ox = floor(ppos.x / tile) * tile, oy = floor(ppos.y / tile) * tile
         var i = 0
@@ -1046,7 +2102,254 @@ final class GameScene: SKScene {
         state.hpFraction = max(0, hp / stats.maxHP)
         state.kills = kills
         state.coins = coinsCollected
-        if let b = boss, b.alive { state.bossName = b.kind.bossTitle; state.bossHP = max(0, b.hp / b.maxHP) } else { state.bossName = nil }
+        if time - lastKillT > Combo.window { combo = 0 }
+        state.combo = combo
+        if let b = boss, b.alive { state.bossName = b.title; state.bossHP = max(0, b.hp / b.maxHP) } else { state.bossName = nil }
+    }
+
+    // MARK: combos, knockout, ally, missions
+
+    private func countCombo() {
+        combo = time - lastKillT <= Combo.window ? combo + 1 : 1
+        lastKillT = time
+        bestCombo = max(bestCombo, combo)
+        if let c = Combo.reward(at: combo) {
+            coinsCollected += c
+            state.flash("🔥 COMBO x\(combo)! +\(c) coins", seconds: 1.4)
+            Sound.coin.play(volume: 0.7, minGap: 0.1)
+            Haptics.light()
+        }
+    }
+
+    /// Boss knockout: a moment of slow motion and a camera punch-in.
+    private func knockout(at p: CGPoint) {
+        timeScale = 0.25
+        cam.removeAction(forKey: "ko")
+        cam.run(.sequence([.scale(to: 0.78, duration: 0.15), .wait(forDuration: 0.85), .scale(to: 1, duration: 0.35)]), withKey: "ko")
+        run(.sequence([.wait(forDuration: 1.1), .run { [weak self] in self?.timeScale = 1 }]))
+        let ring = SKShapeNode(circleOfRadius: 60); ring.position = p; ring.strokeColor = .white; ring.lineWidth = 8; ring.glowWidth = 10
+        fxLayer.addChild(ring)
+        ring.run(.sequence([.group([.scale(to: 6, duration: 0.6), .fadeOut(withDuration: 0.6)]), .removeFromParent()]))
+        state.flash("💥 KNOCKOUT!", seconds: 1.5)
+    }
+
+    private func setupAlly() {
+        guard let ally else { return }
+        allyNode.texture = tex(ally.texture)
+        allyNode.size = CGSize(width: 40, height: 40); allyNode.zPosition = 5
+        allyPos = CGPoint(x: ppos.x - 40, y: ppos.y + 30)
+        world.addChild(allyNode)
+        allyNode.run(.repeatForever(.sequence([.moveBy(x: 0, y: 4, duration: 0.4), .moveBy(x: 0, y: -4, duration: 0.4)])))
+    }
+
+    private func updateAlly(_ dt: Double) {
+        guard let ally else { return }
+        // Follows a little behind Nano.
+        let side: CGFloat = player.xScale < 0 ? 44 : -44
+        let target = CGPoint(x: ppos.x + side, y: ppos.y + 30)
+        allyPos.x += (target.x - allyPos.x) * CGFloat(min(1, dt * 6))
+        allyPos.y += (target.y - allyPos.y) * CGFloat(min(1, dt * 6))
+        allyT -= dt
+        guard allyT <= 0 else { return }
+        allyT = ally.cooldown
+        switch ally {
+        case .medic:
+            guard hp < stats.maxHP else { return }
+            let heal = stats.maxHP * 0.06
+            hp = min(stats.maxHP, hp + heal)
+            popLabel("+\(Int(heal))", color: UIColor(red: 0.4, green: 1, blue: 0.55, alpha: 1))
+        case .guardian:
+            var cleared = 0
+            for i in shots.indices.reversed() where dist2(shots[i].pos, ppos) < 150 * 150 {
+                shots[i].node.removeFromParent(); shots.remove(at: i); cleared += 1
+            }
+            each(near: ppos, radius: 110) { e in
+                if dist2(e.pos, self.ppos) < 110 * 110, !e.kind.isBoss { self.damage(e, 12 * self.stats.damage, knock: norm(sub(e.pos, self.ppos)), kb: 260, quiet: true) }
+            }
+            let ring = SKShapeNode(circleOfRadius: 110); ring.position = ppos; ring.strokeColor = UIColor(red: 0.45, green: 0.7, blue: 1, alpha: 0.8); ring.lineWidth = 4; ring.blendMode = .add
+            ring.setScale(0.3); fxLayer.addChild(ring)
+            ring.run(.sequence([.group([.scale(to: 1, duration: 0.25), .fadeOut(withDuration: 0.3)]), .removeFromParent()]))
+        case .hunter:
+            guard let t = nearest(to: allyPos, within: 380) else { allyT = 0.3; return }
+            lightning([allyPos, t.pos])
+            damage(t, 14 * stats.damage, knock: norm(sub(t.pos, allyPos)), kb: 80, quiet: true)
+        }
+    }
+
+    // MARK: pet, ghost, nemesis
+
+    private func setupPet() {
+        guard let pet else { return }
+        petNode.texture = tex(pet.texture)
+        petNode.size = CGSize(width: 36, height: 36); petNode.zPosition = 5
+        petPos = CGPoint(x: ppos.x + 40, y: ppos.y - 30)
+        world.addChild(petNode)
+        petNode.run(.repeatForever(.sequence([.moveBy(x: 0, y: 3, duration: 0.3), .moveBy(x: 0, y: -3, duration: 0.3)])))
+    }
+
+    private func updatePet(_ dt: Double) {
+        guard let pet else { return }
+        let side: CGFloat = player.xScale < 0 ? -40 : 40
+        let target = CGPoint(x: ppos.x + side, y: ppos.y - 32)
+        petPos.x += (target.x - petPos.x) * CGFloat(min(1, dt * 7))
+        petPos.y += (target.y - petPos.y) * CGFloat(min(1, dt * 7))
+        petNode.position = petPos
+        petNode.xScale = player.xScale < 0 ? -1 : 1
+        bubbleNode?.position = ppos
+        petT -= dt
+        guard petT <= 0 else { return }
+        petT = pet.cooldown(petLevel)
+        switch pet {
+        case .pip:
+            let r = Pet.fetchRange(petLevel)
+            var fetched = 0
+            for i in pickups.indices where !pickups[i].pulled && dist2(pickups[i].pos, ppos) < r * r { pickups[i].pulled = true; fetched += 1 }
+            if fetched > 0 {
+                let ring = ringSprite(at: ppos, radius: r, color: UIColor(red: 0.7, green: 1, blue: 0.4, alpha: 0.6))
+                ring.setScale(1)
+                addFX(ring, life: [.group([.scale(to: 0.2, duration: 0.35), .fadeOut(withDuration: 0.35)])])
+            }
+        case .bloop:
+            guard !bubbleUp else { return }
+            bubbleUp = true
+            let b = ringSprite(at: ppos, radius: 46, color: UIColor(red: 0.6, green: 0.9, blue: 1, alpha: 0.8), filled: true)
+            b.zPosition = 6; b.setScale(0.2)
+            world.addChild(b); bubbleNode = b
+            b.run(.scale(to: 1, duration: 0.25))
+        case .zip:
+            guard let t = nearest(to: petPos, within: 360) else { petT = 0.3; return }
+            let dir = norm(sub(t.pos, petPos))
+            let n = SKSpriteNode(texture: tex("bolt")); n.size = CGSize(width: 24, height: 10)
+            n.color = UIColor(red: 1, green: 0.9, blue: 0.3, alpha: 1); n.colorBlendFactor = 0.9
+            n.zRotation = CGFloat(atan2(dir.dy, dir.dx)); n.position = petPos; shotLayer.addChild(n)
+            bolts.append(Bolt(pos: petPos, vel: CGVector(dx: dir.dx * 620, dy: dir.dy * 620), damage: Pet.sparkDamage(petLevel) * stats.damage, pierce: 0, life: 0.8, node: n))
+        }
+    }
+
+    private func setupGhost() {
+        guard ghost != nil else { return }
+        ghostNode.texture = tex(skin.texture(.happy))
+        ghostNode.size = CGSize(width: 64, height: 64); ghostNode.zPosition = 4.5
+        ghostNode.alpha = 0.32; ghostNode.color = UIColor(red: 0.6, green: 0.85, blue: 1, alpha: 1); ghostNode.colorBlendFactor = 0.6
+        let tag = SKLabelNode(fontNamed: "AvenirNext-Heavy"); tag.text = "BEST RUN"; tag.fontSize = 11
+        tag.fontColor = UIColor(white: 1, alpha: 0.9); tag.position = CGPoint(x: 0, y: 40)
+        ghostNode.addChild(tag)
+        world.addChild(ghostNode)
+    }
+
+    private func updateGhost(_ dt: Double) {
+        // Record this run for a future ghost.
+        if !state.organ.isSideMode, !bossDefeated {
+            recT -= dt
+            if recT <= 0 { recT += Ghost.interval; recXs.append(Float(ppos.x)); recYs.append(Float(ppos.y)) }
+        }
+        guard let ghost, !ghostGone else { return }
+        if let p = ghost.position(at: time) {
+            ghostNode.position = CGPoint(x: p.x, y: p.y)
+        } else {
+            ghostGone = true
+            ghostNode.run(.sequence([.fadeOut(withDuration: 0.5), .removeFromParent()]))
+            if !bossDefeated { state.flash("👻 Your best run cleared here at \(timeString(ghost.time))", seconds: 2) }
+        }
+    }
+
+    /// This run as a ghost (nil for side modes).
+    var recordedGhost: Ghost? {
+        state.organ.isSideMode || recXs.isEmpty ? nil : Ghost(time: time, xs: recXs, ys: recYs)
+    }
+
+    /// The boss on screen when Nano went down (it becomes the Nemesis).
+    var defeatedBy: BossSetup? {
+        guard let b = boss, b.alive, b !== nemesisEnemy else { return nil }
+        return BossSetup(kind: b.kind, variant: b.variant)
+    }
+
+    private func updateNemesis() {
+        guard let nemesis, !nemesisSpawned, !bossDefeated, time >= Nemesis.arrival else { return }
+        nemesisSpawned = true
+        let setup = nemesis.setup
+        let a = Double.random(in: 0..<(2 * .pi))
+        let e = spawn(setup.kind, at: CGPoint(x: ppos.x + cos(a) * 300, y: ppos.y + sin(a) * 300),
+                      hpMul: setup.variant.hpScale * nemesis.hpScale, sizeMul: setup.variant.sizeScale)
+        e.variant = setup.variant; e.title = "Nemesis " + setup.title; e.speed *= setup.variant.speedScale
+        e.node.texture = tex(setup.texture)
+        if let t = setup.variant.tint { e.baseTint = UIColor(red: t.r, green: t.g, blue: t.b, alpha: 1); e.baseBlend = 0; restoreTint(e) }
+        e.timerA = 3; e.timerB = 5
+        nemesisEnemy = e
+        seen.insert(setup.texture)
+        Sound.warning.play(); Haptics.medium(); shake = 0.5
+        state.flash("😈 NEMESIS: \(setup.title.uppercased())\n\"Remember me, Nano?\"", seconds: 3)
+    }
+
+    private func setupMode() {
+        switch mode {
+        case .normal: break
+        case .defense:
+            bedNode.texture = tex("bed"); bedNode.size = CGSize(width: 110, height: 110); bedNode.position = bedPos; bedNode.zPosition = 1.5
+            world.addChild(bedNode)
+            let glow = SKShapeNode(circleOfRadius: 60); glow.strokeColor = UIColor(red: 0.4, green: 1, blue: 0.6, alpha: 0.6); glow.lineWidth = 3
+            glow.run(.repeatForever(.sequence([.scale(to: 1.15, duration: 0.8), .scale(to: 1, duration: 0.8)])))
+            bedNode.addChild(glow)
+            state.flash("🏥 HOSPITAL DEFENSE! PROTECT THE BED", seconds: 3)
+        case .escape:
+            let a = Double.random(in: 0..<(2 * .pi))
+            exitPos = CGPoint(x: cos(a) * RunMode.escapeDistance, y: sin(a) * RunMode.escapeDistance)
+            exitNode.position = exitPos; exitNode.zPosition = 1.5
+            exitNode.strokeColor = UIColor(red: 0.4, green: 1, blue: 0.7, alpha: 1); exitNode.lineWidth = 8; exitNode.glowWidth = 10
+            exitNode.fillColor = UIColor(red: 0.4, green: 1, blue: 0.7, alpha: 0.15)
+            exitNode.run(.repeatForever(.sequence([.scale(to: 1.15, duration: 0.6), .scale(to: 0.95, duration: 0.6)])))
+            let label = SKLabelNode(fontNamed: "AvenirNext-Heavy"); label.text = "EXIT"; label.fontSize = 26; label.verticalAlignmentMode = .center
+            exitNode.addChild(label)
+            world.addChild(exitNode)
+            let path = CGMutablePath(); path.move(to: CGPoint(x: 18, y: 0)); path.addLine(to: CGPoint(x: -12, y: 12)); path.addLine(to: CGPoint(x: -12, y: -12)); path.closeSubpath()
+            exitArrow.path = path; exitArrow.fillColor = UIColor(red: 0.4, green: 1, blue: 0.7, alpha: 0.95); exitArrow.strokeColor = .white; exitArrow.lineWidth = 2
+            exitArrow.zPosition = 90
+            cam.addChild(exitArrow)
+            state.flash("🏃 ESCAPE! FLY TO THE EXIT", seconds: 3)
+        }
+    }
+
+    private func hitBed(_ amount: Double) {
+        guard mode == .defense, !over, !bossDefeated, bedHP > 0 else { return }
+        bedHP -= amount
+        bedNode.run(.sequence([.colorize(with: .red, colorBlendFactor: 0.7, duration: 0.05), .colorize(withColorBlendFactor: 0, duration: 0.25)]))
+        Haptics.light()
+        if bedHP <= 0, !god {
+            bedHP = 0
+            state.flash("The bed was overrun!", seconds: 2)
+            die()
+        }
+    }
+
+    private func updateMode(_ dt: Double) {
+        switch mode {
+        case .normal: break
+        case .defense:
+            let left = max(0, Int(RunMode.defenseBossTime - time))
+            let text = boss != nil || bossDefeated ? "Bed \(Int(bedHP))% · beat the boss!" : "Bed \(Int(bedHP))% · boss in \(left)s"
+            if state.objective != text { state.objective = text }
+        case .escape:
+            let d = sqrt(dist2(ppos, exitPos))
+            let text = "Exit: \(Int(d / 10)) m"
+            if state.objective != text { state.objective = text }
+            if d < 70, !bossDefeated, !over {
+                bossDefeated = true
+                state.flash("🏃 ESCAPED!", seconds: 2)
+                winSequence()
+            }
+        }
+    }
+
+    /// Escape: an arrow at the screen edge points to the exit while it's off screen.
+    private func pointArrow() {
+        let v = sub(exitPos, ppos)
+        let a = atan2(v.dy, v.dx)
+        let hw = size.width / 2 - 34, hh = size.height / 2 - 120
+        let onScreen = abs(v.dx) < hw && abs(v.dy) < hh
+        exitArrow.isHidden = onScreen
+        let k = min(hw / max(0.001, abs(cos(a))), hh / max(0.001, abs(sin(a))))
+        exitArrow.position = CGPoint(x: cos(a) * k, y: sin(a) * k)
+        exitArrow.zRotation = a
     }
 
     // MARK: autoplay (UI tests / screenshots)

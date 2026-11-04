@@ -26,6 +26,11 @@ final class RunState: ObservableObject {
     @Published var revivesUsed = 0
     /// "Drag anywhere to fly" hint on the first run, hidden at the first touch.
     @Published var moveHint = false
+    /// Bonus objective for this run (shown under the weapons), and whether it's done.
+    @Published var objective: String?
+    @Published var objectiveDone = false
+    /// Kills in a row (shown from 10 up).
+    @Published var combo = 0
 
     /// Set by the scene; the HUD calls these.
     var onChoose: ((UpgradeOption) -> Void)?

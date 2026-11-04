@@ -76,7 +76,7 @@ final class PlayUITests: XCTestCase {
         app.launch()
         sleep(7)
         for i in 1...6 {
-            if app.buttons["upgrade0"].exists { app.buttons["upgrade0"].tap(); sleep(1) }
+            // -autoplay picks level-up cards by itself; tapping here raced with it and could fail.
             save(app, "s0\(i)-boss"); sleep(2)
         }
     }

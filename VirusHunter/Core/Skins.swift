@@ -2,7 +2,7 @@ import Foundation
 
 /// Nano's look. Classic is free; the rest are bought with Bio-Coins or earned by clearing an organ.
 enum Skin: String, CaseIterable, Codable, Identifiable {
-    case classic, neon, toxic, stealth, gold
+    case classic, neon, toxic, stealth, gold, frost, plasma, royal
     var id: String { rawValue }
 
     enum Pose: String { case happy, fight, joy, hurt }
@@ -14,6 +14,9 @@ enum Skin: String, CaseIterable, Codable, Identifiable {
         case .toxic: return "Toxic Nano"
         case .stealth: return "Stealth Nano"
         case .gold: return "Golden Nano"
+        case .frost: return "Frost Nano"
+        case .plasma: return "Plasma Nano"
+        case .royal: return "Royal Nano"
         }
     }
 
@@ -28,7 +31,16 @@ enum Skin: String, CaseIterable, Codable, Identifiable {
         case .neon: return 250
         case .toxic: return 600
         case .stealth: return 1200
-        case .gold: return nil
+        case .gold, .frost, .plasma, .royal: return nil
+        }
+    }
+    /// Cities that must be saved to earn the skin.
+    var cityReward: Int? {
+        switch self {
+        case .frost: return 3
+        case .plasma: return 5
+        case .royal: return Organ.maxInfection
+        default: return nil
         }
     }
     /// Organ that unlocks the skin when cleared.
@@ -37,6 +49,7 @@ enum Skin: String, CaseIterable, Codable, Identifiable {
     var howToGet: String {
         if let p = price { return p == 0 ? "Free" : "\(p) Bio-Coins" }
         if let s = clearStage { return "Clear the \(Organ.all[s - 1].name)" }
+        if let c = cityReward { return c >= Organ.maxInfection ? "Save all 10 cities" : "Save \(c) cities" }
         return ""
     }
 }
@@ -47,6 +60,7 @@ extension SaveData {
     func owns(_ s: Skin) -> Bool {
         if s == .classic || ownedSkins.contains(s.rawValue) { return true }
         if let st = s.clearStage { return clearedStages.contains(st) }
+        if let c = s.cityReward { return bestCities >= c }
         return false
     }
 
@@ -70,6 +84,11 @@ extension SaveData {
         let open = TechKind.allCases.filter { level($0) < $0.maxLevel }
         if let t = open.min(by: { $0.cost(toLevel: level($0) + 1) < $1.cost(toLevel: level($1) + 1) }) {
             return ("\(t.title) Lv \(level(t) + 1)", nil, t.symbol, t.cost(toLevel: level(t) + 1))
+        }
+        // Everything MAX: point at the cheapest Mutation Rank.
+        let ranked = TechKind.allCases.filter { rank($0) < $0.maxRank }
+        if let t = ranked.min(by: { $0.rankCost(toRank: rank($0) + 1) < $1.rankCost(toRank: rank($1) + 1) }) {
+            return ("\(t.title) Rank \(rank(t) + 1)", nil, t.symbol, t.rankCost(toRank: rank(t) + 1))
         }
         return nil
     }
