@@ -28,7 +28,14 @@ struct HomeView: View {
                     .buttonStyle(PressStyle())
                     .accessibilityIdentifier("dailyButton")
                     Spacer()
-                    toggle("trophy.fill") { GameCenter.showDashboard() }.accessibilityIdentifier("gameCenterButton")
+                    toggle("trophy.fill") { model.go(.trophies) }
+                        .overlay(alignment: .topTrailing) {
+                            if model.save.unclaimedTrophies > 0 {
+                                Text("\(model.save.unclaimedTrophies)").font(Theme.body(11, .black)).foregroundStyle(.white)
+                                    .frame(width: 20, height: 20).background(Circle().fill(Theme.magenta)).offset(x: 6, y: -6)
+                            }
+                        }
+                        .accessibilityIdentifier("trophiesButton")
                     toggle(sound ? "speaker.wave.2.fill" : "speaker.slash.fill") { sound.toggle() }.accessibilityIdentifier("soundToggle")
                     toggle(haptics ? "iphone.radiowaves.left.and.right" : "iphone.slash") { haptics.toggle() }
                 }

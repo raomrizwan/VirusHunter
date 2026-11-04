@@ -11,17 +11,6 @@ enum GameCenter {
         case kills = "vh.leaderboard.kills"           // total viruses destroyed
     }
 
-    enum Achievement: String, CaseIterable {
-        case firstBoss = "vh.ach.first_boss"
-        case firstCity = "vh.ach.first_city"
-        case fiveCities = "vh.ach.five_cities"
-        case countrySaved = "vh.ach.country_saved"
-        case evolved = "vh.ach.evolved"
-        case streak7 = "vh.ach.streak7"
-        case endless10 = "vh.ach.endless10"
-        case kills10k = "vh.ach.kills10k"
-    }
-
     static var enabled: Bool { GKLocalPlayer.local.isAuthenticated && !AppModel.uiTesting }
 
     /// Signs in quietly on launch; Apple shows its own sign-in sheet only when needed.
@@ -39,17 +28,9 @@ enum GameCenter {
         for (b, v) in scores where v > 0 {
             GKLeaderboard.submitScore(v, context: 0, player: GKLocalPlayer.local, leaderboardIDs: [b.rawValue]) { _ in }
         }
-        var done: [Achievement] = []
-        if save.clearedStages.contains(1) { done.append(.firstBoss) }
-        if save.citiesCleared >= 1 { done.append(.firstCity) }
-        if save.citiesCleared >= 5 { done.append(.fiveCities) }
-        if save.citiesCleared >= Organ.maxInfection { done.append(.countrySaved) }
-        if save.everEvolved { done.append(.evolved) }
-        if save.daily.streak >= 7 { done.append(.streak7) }
-        if save.bestEndless >= 600 { done.append(.endless10) }
-        if save.totalKills >= 10_000 { done.append(.kills10k) }
-        let list = done.map { a -> GKAchievement in
-            let g = GKAchievement(identifier: a.rawValue); g.percentComplete = 100; g.showsCompletionBanner = true; return g
+        // Every in-game trophy is mirrored as a Game Center achievement "vh.ach.<trophy>".
+        let list = Trophy.allCases.filter { $0.done(save) }.map { t -> GKAchievement in
+            let g = GKAchievement(identifier: "vh.ach.\(t.rawValue)"); g.percentComplete = 100; g.showsCompletionBanner = true; return g
         }
         if !list.isEmpty { GKAchievement.report(list) { _ in } }
     }

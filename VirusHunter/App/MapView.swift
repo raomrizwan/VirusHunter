@@ -129,7 +129,18 @@ struct MapView: View {
     private var cityStatus: some View {
         let infected = model.save.infected(inCity: city)
         let done = model.save.organsCleared(inCity: city)
-        return HStack(spacing: 10) {
+        let mutation = CityMutation.forCity(city, country: country.id)
+        return VStack(spacing: 6) {
+        if mutation != .none {
+            HStack(spacing: 8) {
+                Image(systemName: mutation.symbol).font(.system(size: 14, weight: .bold)).foregroundStyle(Theme.magenta)
+                Text(mutation.title.uppercased()).font(Theme.body(12, .heavy)).tracking(1).foregroundStyle(Theme.magenta)
+                Text(mutation.detail).font(Theme.body(11)).foregroundStyle(Theme.muted).lineLimit(1).minimumScaleFactor(0.7)
+                Spacer(minLength: 0)
+            }
+            .accessibilityIdentifier("cityMutation")
+        }
+        HStack(spacing: 10) {
             Label(infected == 0 ? "City saved" : "\(infected.formatted()) infected",
                   systemImage: infected == 0 ? "checkmark.seal.fill" : "allergens")
                 .font(Theme.body(14, .heavy)).foregroundStyle(infected == 0 ? Theme.lime : Theme.red)
@@ -140,6 +151,7 @@ struct MapView: View {
                 }
             }
             Text("\(done)/\(Organ.all.count) organs clean").font(Theme.body(12, .bold)).foregroundStyle(Theme.muted)
+        }
         }
         .padding(.horizontal, 14).padding(.vertical, 9).glass(14)
         .accessibilityIdentifier("cityStatus")

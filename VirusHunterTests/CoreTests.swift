@@ -245,4 +245,24 @@ final class CoreTests: XCTestCase {
         XCTAssertFalse(l.candidates().contains { if case .weapon(.laser, _) = $0 { return true } else { return false } })
         XCTAssertGreaterThan(WeaponStats.laser(evolvedLevel).damage, WeaponStats.laser(5).damage)
     }
+
+    func testEveryCityHasItsOwnMutation() {
+        for c in ["PK", "US", "WORLD"] {
+            XCTAssertEqual(CityMutation.forCity(1, country: c), CityMutation.none)
+            let rest = (2...Organ.maxInfection).map { CityMutation.forCity($0, country: c) }
+            XCTAssertEqual(Set(rest).count, rest.count, c)
+            XCTAssertFalse(rest.contains(.none))
+        }
+        XCTAssertEqual(Organ.endless.mutation(country: "PK"), CityMutation.none)
+    }
+
+    func testTrophiesPayOnce() {
+        var s = SaveData(); s.totalKills = 1_500
+        XCTAssertTrue(Trophy.kills1k.done(s))
+        XCTAssertEqual(s.unclaimedTrophies, 1)
+        XCTAssertEqual(s.claimTrophy(.kills1k), Trophy.kills1k.reward)
+        XCTAssertNil(s.claimTrophy(.kills1k))
+        XCTAssertNil(s.claimTrophy(.kills10k))
+        XCTAssertEqual(s.unclaimedTrophies, 0)
+    }
 }

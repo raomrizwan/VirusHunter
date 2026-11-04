@@ -92,6 +92,7 @@ struct GameContent: View {
         if won { s.recordClear(organ) }
         let scene = won ? Story.afterWin(organ, before: model.save, after: s) : nil
         if organ.isEndless { s.bestEndless = max(s.bestEndless, r.time) }
+        s.goldenCaught += r.golden
         if holder.state.loadout.weapons.values.contains(where: { $0 >= evolvedLevel }) { s.everEvolved = true }
         s.daily.refresh()
         s.daily.record(RunReport(kills: r.kills, bosses: r.bosses, cleared: won && !organ.isEndless, seconds: r.time,
@@ -189,6 +190,13 @@ struct HUD: View {
                     }
                 }
                 Spacer()
+                if let o = state.objective {
+                    Label(o, systemImage: state.objectiveDone ? "checkmark.circle.fill" : "target")
+                        .font(Theme.body(11, .heavy)).foregroundStyle(state.objectiveDone ? Theme.lime : Theme.gold)
+                        .lineLimit(1).minimumScaleFactor(0.7)
+                        .padding(.horizontal, 8).padding(.vertical, 5).background(Capsule().fill(.black.opacity(0.45)))
+                        .accessibilityIdentifier("objective")
+                }
             }
             if let name = state.bossName {
                 VStack(spacing: 3) {

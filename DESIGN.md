@@ -70,6 +70,17 @@ Cast: Nano, **Dr. Leuko** (white blood cell commander), **King Vex** (virus mast
 Scenes (`Core/Story.swift`): chapter intro before each organ's first run, outro on first clear, "clear-1" after the first city,
 an arrival scene per city 2-10 on the map, a finale after city 10, Endless intro. Seen scenes replay from the map's Story journal.
 
+### City mutations, organ hazards, events, bonus objectives
+- Cities 2-10 each get one twist (`Core/Mutations.swift`, order shuffled per country, revealed only on arrival): Splitter, Giant,
+  Blackout (light circle around Nano), Toxic Ground (puddles), Twin Bosses, Speed, Ghost (invisible until close), Swarm, Armored.
+- Organ hazards (not Endless): Lungs wind gusts, Heart heartbeats (viruses sprint), Stomach acid rain, Brain neuron beams, Marrow bone-spike lines.
+- Random events: Golden Virus (flees, 15 s, 30 coins, trophy), supply-drop chest, King Vex ambush from city 3 (survive 20 s, +40).
+- One bonus objective per run (+60): no damage 45 s, 250 kills by 3:00, boss in 45 s, open 3 chests.
+
+### Trophies
+14 in-game trophies with coin rewards (`Core/Trophies.swift`), screen from the Home trophy button; Game Center mirrors them
+as `vh.ach.<trophy rawValue>` and the Leaderboards button shows only when signed in.
+
 ### Infection Levels (replay)
 City N plays every organ at Infection Level N (the city strip on the map selects it; "Next: organ · city" on the win screen).
 Each level above 1: enemy health/damage +40% (of the stage value), speed +3%, spawn rate +7%, elites every 60 s → 30 s min (−3 s/level),

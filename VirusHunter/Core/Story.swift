@@ -185,7 +185,11 @@ enum Story {
     static func mapScene(save: SaveData) -> StoryScene? {
         let c = save.currentCity
         guard c >= 2, save.citiesCleared < Organ.maxInfection, !save.seenStory.contains("city-\(c)"), let s = scene("city-\(c)") else { return nil }
-        return resolve(s, country: save.country, city: c)
+        // Reveal this city's mutation only now, as a surprise.
+        let m = CityMutation.forCity(c, country: save.country.id)
+        let warning = StoryLine(speaker: .leuko, text: "Careful, Nano. Scans show a \(m.title) here: \(m.detail)")
+        let r = resolve(s, country: save.country, city: c)
+        return StoryScene(id: r.id, title: r.title, lines: r.lines + [warning])
     }
 
     /// Shown after a won run: a saved city (first city / whole country), else the organ's first-clear outro.

@@ -170,6 +170,7 @@ extension SaveData {
     mutating func claimDailyBonus() -> Int? {
         guard daily.canClaimBonus else { return nil }
         daily.bonusClaimed = true
+        dailyBonuses += 1
         coins += DailyState.bonusReward
         return DailyState.bonusReward
     }
@@ -177,6 +178,7 @@ extension SaveData {
     mutating func claimStreak() -> Int? {
         guard daily.canClaimStreak else { return nil }
         daily.streakClaimedDay = daily.lastLoginDay
+        bestStreak = max(bestStreak, daily.streak)
         coins += daily.streakReward
         return daily.streakReward
     }

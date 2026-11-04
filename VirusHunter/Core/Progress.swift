@@ -71,6 +71,10 @@ struct SaveData: Codable, Equatable {
     var countryCode: String?                    // chosen outbreak country (nil = not asked yet)
     var daily = DailyState()                    // daily missions + login streak
     var everEvolved = false                     // evolved a weapon at least once (achievement)
+    var claimedTrophies: Set<String> = []
+    var bestStreak = 0                          // longest login streak
+    var dailyBonuses = 0                        // times all three daily missions were finished
+    var goldenCaught = 0                        // Golden Viruses caught
 
     func level(_ t: TechKind) -> Int { tech[t.rawValue] ?? 0 }
     func rank(_ t: TechKind) -> Int { ranks[t.rawValue] ?? 0 }
@@ -136,6 +140,10 @@ extension SaveData {
         countryCode = try c.decodeIfPresent(String.self, forKey: .countryCode)
         daily = try c.decodeIfPresent(DailyState.self, forKey: .daily) ?? d.daily
         everEvolved = try c.decodeIfPresent(Bool.self, forKey: .everEvolved) ?? d.everEvolved
+        claimedTrophies = try c.decodeIfPresent(Set<String>.self, forKey: .claimedTrophies) ?? d.claimedTrophies
+        bestStreak = try c.decodeIfPresent(Int.self, forKey: .bestStreak) ?? d.bestStreak
+        dailyBonuses = try c.decodeIfPresent(Int.self, forKey: .dailyBonuses) ?? d.dailyBonuses
+        goldenCaught = try c.decodeIfPresent(Int.self, forKey: .goldenCaught) ?? d.goldenCaught
     }
 }
 
