@@ -838,22 +838,27 @@ final class GameScene: SKScene {
     // MARK: pickups & levels
 
     private func drop(_ kind: PickupKind, at p: CGPoint) {
-        let name: String; var s: CGFloat
+        var name: String; var s: CGFloat
         switch kind {
         case .xp(let v): name = v >= 5 ? "orb-big" : "orb"; s = v >= 5 ? 22 : 15
         case .coin: name = "coin"; s = 20
         case .heart: name = "heart"; s = 24
         case .chest: name = "chest"; s = 40
         }
-        if pickups.count > 320, case .xp = kind {
-            // Merge into the oldest orb so the screen stays readable.
-            if let i = pickups.firstIndex(where: { if case .xp = $0.kind { return true } else { return false } }) {
-                if case .xp(let old) = pickups[i].kind, case .xp(let add) = kind {
-                    let n = pickups[i].node
-                    pickups[i] = Pickup(kind: .xp(old + add), pos: pickups[i].pos, node: n)
-                    n.texture = tex("orb-big"); n.size = CGSize(width: 22, height: 22)
-                }
-                return
+        var kind = kind
+        if pickups.count > 320, case .xp(let add) = kind {
+            // Too many orbs on the field: recycle the XP orb farthest from the player into this new drop,
+            // so its value moves to where the fight is. (Merging into the oldest orb used to bury all new
+            // DNA in orbs left far behind, which made long Endless runs stop leveling up.)
+            var far = -1, farD = -1.0
+            for i in pickups.indices where !pickups[i].pulled {
+                if case .xp = pickups[i].kind { let d = dist2(pickups[i].pos, ppos); if d > farD { farD = d; far = i } }
+            }
+            if far >= 0, case .xp(let old) = pickups[far].kind {
+                pickups[far].node.removeFromParent()
+                pickups.remove(at: far)
+                kind = .xp(old + add)
+                name = "orb-big"; s = 22
             }
         }
         let n = SKSpriteNode(texture: tex(name)); n.size = CGSize(width: s, height: s); n.position = p
