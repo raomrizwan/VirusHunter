@@ -166,31 +166,31 @@ struct PlayerStats: Equatable {
     }
 }
 
-/// Weapon numbers per level (index 0 = level 1).
+/// Weapon numbers per level (index 0 = level 1, index 5 = evolved).
 enum WeaponStats {
     static func laser(_ l: Int) -> (cooldown: Double, damage: Double, bolts: Int, pierce: Int) {
-        let i = max(0, min(4, l - 1))
-        return ([0.85, 0.78, 0.7, 0.64, 0.56][i], [12, 15, 19, 23, 30][i], [1, 1, 2, 2, 3][i], [0, 0, 1, 1, 3][i])
+        let i = max(0, min(evolvedLevel - 1, l - 1))
+        return ([0.85, 0.78, 0.7, 0.64, 0.56, 0.42][i], [12, 15, 19, 23, 30, 42][i], [1, 1, 2, 2, 3, 5][i], [0, 0, 1, 1, 3, 99][i])
     }
     static func swarm(_ l: Int) -> (bots: Int, damage: Double, cooldown: Double) {
-        let i = max(0, min(4, l - 1))
-        return ([1, 2, 3, 4, 6][i], [10, 12, 14, 17, 22][i], [1.2, 1.1, 1.0, 0.9, 0.8][i])
+        let i = max(0, min(evolvedLevel - 1, l - 1))
+        return ([1, 2, 3, 4, 6, 8][i], [10, 12, 14, 17, 22, 32][i], [1.2, 1.1, 1.0, 0.9, 0.8, 0.6][i])
     }
     static func shield(_ l: Int) -> (orbs: Int, damage: Double, radius: Double) {
-        let i = max(0, min(4, l - 1))
-        return ([2, 3, 3, 4, 5][i], [8, 10, 13, 16, 20][i], [78, 82, 88, 94, 100][i])
+        let i = max(0, min(evolvedLevel - 1, l - 1))
+        return ([2, 3, 3, 4, 5, 7][i], [8, 10, 13, 16, 20, 30][i], [78, 82, 88, 94, 100, 118][i])
     }
     static func field(_ l: Int) -> (radius: Double, damage: Double) {
-        let i = max(0, min(4, l - 1))
-        return ([70, 84, 98, 114, 130][i], [5, 6.5, 8, 10.5, 14][i])
+        let i = max(0, min(evolvedLevel - 1, l - 1))
+        return ([70, 84, 98, 114, 130, 168][i], [5, 6.5, 8, 10.5, 14, 21][i])
     }
     static func zap(_ l: Int) -> (cooldown: Double, jumps: Int, damage: Double) {
-        let i = max(0, min(4, l - 1))
-        return ([1.6, 1.45, 1.3, 1.15, 1.0][i], [3, 4, 5, 6, 7][i], [16, 19, 23, 28, 34][i])
+        let i = max(0, min(evolvedLevel - 1, l - 1))
+        return ([1.6, 1.45, 1.3, 1.15, 1.0, 0.6][i], [3, 4, 5, 6, 7, 11][i], [16, 19, 23, 28, 34, 46][i])
     }
     static func bomb(_ l: Int) -> (cooldown: Double, radius: Double, damage: Double) {
-        let i = max(0, min(4, l - 1))
-        return ([2.2, 2.0, 1.8, 1.6, 1.4][i], [80, 88, 98, 108, 120][i], [30, 38, 48, 58, 70][i])
+        let i = max(0, min(evolvedLevel - 1, l - 1))
+        return ([2.2, 2.0, 1.8, 1.6, 1.4, 1.0][i], [80, 88, 98, 108, 120, 155][i], [30, 38, 48, 58, 70, 100][i])
     }
 }
 

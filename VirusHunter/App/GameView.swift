@@ -183,7 +183,7 @@ struct HUD: View {
                 ForEach(state.loadout.weaponOrder, id: \.self) { w in
                     ZStack(alignment: .bottomTrailing) {
                         Image(systemName: w.symbol).font(.system(size: 14, weight: .bold)).foregroundStyle(Theme.cyan).frame(width: 30, height: 30).background(RoundedRectangle(cornerRadius: 9).fill(.black.opacity(0.4)))
-                        Text("\(state.loadout.level(w))").font(Theme.body(9, .black)).foregroundStyle(.white).padding(2).background(Circle().fill(Theme.magenta)).offset(x: 3, y: 3)
+                        Text(state.loadout.level(w) >= evolvedLevel ? "★" : "\(state.loadout.level(w))").font(Theme.body(9, .black)).foregroundStyle(.white).padding(2).background(Circle().fill(Theme.magenta)).offset(x: 3, y: 3)
                     }
                 }
                 Spacer()
@@ -250,6 +250,7 @@ struct LevelUpView: View {
     private func card(_ o: UpgradeOption) -> some View {
         let (icon, title, tag, detail, color): (String, String, String, String, Color) = {
             switch o {
+            case .weapon(let w, let l) where l >= evolvedLevel: return (w.symbol, w.evolvedTitle, "EVOLVE", w.detail(nextLevel: l), Theme.gold)
             case .weapon(let w, let l): return (w.symbol, w.title, l == 1 ? "NEW!" : "LV \(l)", w.detail(nextLevel: l), Theme.cyan)
             case .passive(let p, let l): return (p.symbol, p.title, l == 1 ? "NEW!" : "LV \(l)", p.detail, Theme.magenta)
             case .heal: return ("heart.fill", "Full Repair", "", "Restore all health.", Theme.lime)
@@ -293,7 +294,7 @@ struct PauseView: View {
                 Text("PAUSED").font(Theme.title(40)).foregroundStyle(.white)
                 VStack(alignment: .leading, spacing: 8) {
                     ForEach(state.loadout.weaponOrder, id: \.self) { w in
-                        Label("\(w.title)  ·  LV \(state.loadout.level(w))", systemImage: w.symbol).font(Theme.body(16)).foregroundStyle(.white)
+                        Label(state.loadout.level(w) >= evolvedLevel ? "\(w.evolvedTitle)  ·  EVOLVED" : "\(w.title)  ·  LV \(state.loadout.level(w))", systemImage: w.symbol).font(Theme.body(16)).foregroundStyle(.white)
                     }
                     ForEach(PassiveKind.allCases.filter { state.loadout.level($0) > 0 }) { p in
                         Label("\(p.title)  ·  LV \(state.loadout.level(p))", systemImage: p.symbol).font(Theme.body(15)).foregroundStyle(Theme.muted)

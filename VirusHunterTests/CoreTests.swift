@@ -229,4 +229,15 @@ final class CoreTests: XCTestCase {
         d.refresh(now: d1.addingTimeInterval(86_400 * 4), calendar: cal)
         XCTAssertEqual(d.streak, 1) // missed days reset the streak
     }
+
+    func testWeaponEvolutionNeedsMaxLevelAndPartner() {
+        var l = Loadout()
+        l.apply(.weapon(.laser, toLevel: 5))
+        XCTAssertFalse(l.candidates().contains(.weapon(.laser, toLevel: evolvedLevel)))
+        l.apply(.passive(.rapid, toLevel: 1))
+        XCTAssertTrue(l.candidates().contains(.weapon(.laser, toLevel: evolvedLevel)))
+        l.apply(.weapon(.laser, toLevel: evolvedLevel))
+        XCTAssertFalse(l.candidates().contains { if case .weapon(.laser, _) = $0 { return true } else { return false } })
+        XCTAssertGreaterThan(WeaponStats.laser(evolvedLevel).damage, WeaponStats.laser(5).damage)
+    }
 }

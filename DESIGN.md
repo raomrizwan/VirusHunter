@@ -50,8 +50,15 @@ Elites (every minute): bigger, glowing ring, drop a chest (free upgrade).
 1. Lungs (pink alveoli) — boss **Sumo Virus** (slam shockwave)
 2. Heart & Blood (red cells) — boss **Cowboy Virus** (dash + bullet ring)
 3. Stomach (green acid) — boss **Royal Guard** (summons + shield)
-4. Brain (purple neurons) — boss **Sumo** v2
-5. Bone Marrow — boss **Cowboy** v2
+4. Brain (purple neurons) — boss **Mind Leech** (psychic spiral + blink-stomp next to Nano)
+5. Bone Marrow — boss **Bone Colossus** (3-wave bone-spear rings, summons blobs, faster under 50%)
+   In the final city (Infection Level 10) the Marrow boss is **King Vex**: dashes, 18-shot rings, summons an elite;
+   enraged under 50%: triple spiral + teleport stomps. Endless cycles all five regular bosses.
+
+### Weapon evolutions
+A weapon at LV 5 plus its partner passive (any level) can be offered as **EVOLVE** (level 6, weighted high):
+Laser + Rapid Cooling = Photon Lance, Swarm + Overcharge = Hive Mind, Shield + Nano Armor = Immune Wall,
+Field + DNA Magnet = Storm Field, Zap + Turbo Jets = Thunderstorm, Bomb + Self-Repair = Cure Nova.
 6. **Endless** (unlocked after stage 2) — survive as long as possible, leaderboard-style best time.
 Difficulty scales with stage number.
 

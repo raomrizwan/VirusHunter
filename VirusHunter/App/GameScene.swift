@@ -19,6 +19,9 @@ final class Enemy {
     var timerB: Double = 0
     var dashing: Double = 0
     var dashDir = CGVector.zero
+    var timerC: Double = 0
+    var spin: Double = 0       // rotating aim for spiral attacks
+    var phase = 0              // boss phase (King Vex enrages at half health)
     var shieldHitCD: Double = 0
     var fieldHitCD: Double = 0
     var alive = true
@@ -343,8 +346,8 @@ final class GameScene: SKScene {
     }
 
     private func spawnBoss() {
-        let kinds: [EnemyKind] = [.bossSumo, .bossCowboy, .bossRoyal]
-        let kind = state.organ.isEndless ? kinds[bossCount % 3] : state.organ.boss
+        let kinds: [EnemyKind] = [.bossSumo, .bossCowboy, .bossRoyal, .bossBrain, .bossMarrow]
+        let kind = state.organ.isEndless ? kinds[bossCount % kinds.count] : state.organ.finalBoss
         let a = Double.random(in: 0..<(2 * .pi))
         let p = bossNear ? CGPoint(x: ppos.x, y: ppos.y + 175) : CGPoint(x: ppos.x + cos(a) * 320, y: ppos.y + sin(a) * 320)
         let e = spawn(kind, at: p)
@@ -412,7 +415,7 @@ final class GameScene: SKScene {
                 if d < 230 { v = CGVector(dx: -toP.dx * e.speed * 0.6, dy: -toP.dy * e.speed * 0.6) }
                 e.timerA -= dt
                 if e.timerA <= 0, d < 420 { e.timerA = 2.6; fire(from: e.pos, dir: toP, speed: 190, damage: 8) }
-            case .bossSumo, .bossCowboy, .bossRoyal:
+            case .bossSumo, .bossCowboy, .bossRoyal, .bossBrain, .bossMarrow, .bossVex:
                 v = bossAI(e, toP: toP, d: d, dt: dt)
             default: break
             }
@@ -486,9 +489,104 @@ final class GameScene: SKScene {
                     fire(from: e.pos, dir: CGVector(dx: cos(a), dy: sin(a)), speed: 230, damage: 11)
                 }
             }
+        case .bossBrain:
+            // Mind Leech: a slow psychic spiral, and it blinks next to Nano with a shockwave.
+            v = CGVector(dx: v.dx * 0.7, dy: v.dy * 0.7)
+            e.timerC -= dt
+            if e.timerC <= 0 {
+                e.timerC = 0.22
+                e.spin += 0.55
+                for k in 0..<2 {
+                    let a = e.spin + Double(k) * .pi
+                    fire(from: e.pos, dir: CGVector(dx: cos(a), dy: sin(a)), speed: 140, damage: 8)
+                }
+            }
+            if e.timerA <= 0 {
+                e.timerA = 5
+                let a = Double.random(in: 0..<(2 * .pi))
+                let target = CGPoint(x: ppos.x + cos(a) * 190, y: ppos.y + sin(a) * 190)
+                e.node.run(.fadeAlpha(to: 0.25, duration: 0.6))
+                telegraphStomp(at: target, radius: 120) { [weak self, weak e] in
+                    guard let self, let e, e.alive else { return }
+                    e.pos = target; e.node.position = target; e.node.alpha = 1
+                    if dist2(self.ppos, target) < 120 * 120 { self.hurt(e.damage) }
+                    self.ring(from: target, count: 12, speed: 180, damage: 10)
+                }
+            }
+        case .bossMarrow:
+            // Bone Colossus: volleys of bone spears, calls in blobs, and speeds up when hurt.
+            if e.hp < e.maxHP * 0.5 { v = CGVector(dx: v.dx * 1.7, dy: v.dy * 1.7) }
+            if e.timerA <= 0 {
+                e.timerA = 4.5
+                for w in 0..<3 {
+                    run(.sequence([.wait(forDuration: 0.35 * Double(w)), .run { [weak self, weak e] in
+                        guard let self, let e, e.alive, !self.simPaused else { return }
+                        self.ring(from: e.pos, count: 8, speed: 210, damage: 12, offset: Double(w) * .pi / 8)
+                    }]))
+                }
+            }
+            if e.timerB <= 0 {
+                e.timerB = 7
+                for _ in 0..<2 { spawn(.blob, at: jitter(e.pos, 80)) }
+                for _ in 0..<4 { spawn(.mini, at: jitter(e.pos, 60)) }
+            }
+        case .bossVex:
+            // King Vex: dashes, rings and summons; at half health he enrages and teleport-stomps.
+            if e.phase == 0, e.hp < e.maxHP * 0.5 {
+                e.phase = 1
+                state.flash("KING VEX IS ENRAGED!", seconds: 2.5)
+                shake = 0.6; Haptics.medium(); Sound.warning.play()
+                e.node.run(.colorize(with: .red, colorBlendFactor: 0.35, duration: 0.4))
+            }
+            let rage = e.phase == 1
+            if e.dashing > 0 {
+                e.dashing -= dt
+                v = CGVector(dx: e.dashDir.dx * 480, dy: e.dashDir.dy * 480)
+            }
+            e.timerC -= dt
+            if rage, e.timerC <= 0 {
+                e.timerC = 0.16
+                e.spin -= 0.45
+                for k in 0..<3 {
+                    let a = e.spin + Double(k) * 2 * .pi / 3
+                    fire(from: e.pos, dir: CGVector(dx: cos(a), dy: sin(a)), speed: 150, damage: 8)
+                }
+            }
+            if e.timerA <= 0 {
+                e.timerA = rage ? 3 : 4
+                if rage {
+                    let target = CGPoint(x: ppos.x + CGFloat.random(in: -60...60), y: ppos.y + CGFloat.random(in: -60...60))
+                    telegraphStomp(at: target, radius: 150) { [weak self, weak e] in
+                        guard let self, let e, e.alive else { return }
+                        e.pos = target; e.node.position = target
+                        if dist2(self.ppos, target) < 150 * 150 { self.hurt(e.damage * 1.2) }
+                        self.ring(from: target, count: 20, speed: 200, damage: 11)
+                    }
+                } else if Bool.random() {
+                    e.dashing = 0.6; e.dashDir = toP
+                } else {
+                    ring(from: e.pos, count: 18, speed: 180, damage: 11)
+                }
+            }
+            if e.timerB <= 0 {
+                e.timerB = rage ? 6 : 8
+                spawn(.elite, at: jitter(e.pos, 120))
+                for i in 0..<6 {
+                    let a = Double(i) / 6 * 2 * .pi
+                    spawn(.spiky, at: CGPoint(x: e.pos.x + cos(a) * 100, y: e.pos.y + sin(a) * 100))
+                }
+            }
         default: break
         }
         return v
+    }
+
+    /// A ring of enemy shots.
+    private func ring(from p: CGPoint, count: Int, speed: Double, damage: Double, offset: Double = 0) {
+        for i in 0..<count {
+            let a = offset + Double(i) / Double(count) * 2 * .pi
+            fire(from: p, dir: CGVector(dx: cos(a), dy: sin(a)), speed: speed, damage: damage)
+        }
     }
 
     private func telegraphStomp(at p: CGPoint, radius: Double, then: @escaping () -> Void) {
@@ -552,6 +650,7 @@ final class GameScene: SKScene {
                         let spread = (Double(i) - Double(w.bolts - 1) / 2) * 0.16
                         let a = atan2(dir.dy, dir.dx) + spread
                         let n = SKSpriteNode(texture: tex("bolt")); n.size = CGSize(width: 34, height: 14); n.zRotation = CGFloat(a)
+                        if lo.level(.laser) >= evolvedLevel { n.color = UIColor(red: 1, green: 0.85, blue: 0.3, alpha: 1); n.colorBlendFactor = 0.8; n.size = CGSize(width: 46, height: 18) }
                         n.position = ppos; shotLayer.addChild(n)
                         bolts.append(Bolt(pos: ppos, vel: CGVector(dx: cos(a) * 560, dy: sin(a) * 560), damage: w.damage * dm, pierce: w.pierce, life: 0.9, node: n))
                     }
@@ -781,6 +880,9 @@ final class GameScene: SKScene {
     private func burst(at p: CGPoint, kind: EnemyKind) {
         let color: UIColor
         switch kind {
+        case .bossBrain: color = UIColor(red: 1, green: 0.55, blue: 0.8, alpha: 1)
+        case .bossMarrow: color = UIColor(red: 0.95, green: 0.92, blue: 0.85, alpha: 1)
+        case .bossVex: color = UIColor(red: 0.75, green: 0.3, blue: 1, alpha: 1)
         case .spiky, .bossCowboy: color = UIColor(red: 0.55, green: 1, blue: 0.3, alpha: 1)
         case .blob, .bossSumo: color = UIColor(red: 0.8, green: 0.5, blue: 1, alpha: 1)
         case .dart: color = UIColor(red: 1, green: 0.6, blue: 0.2, alpha: 1)
@@ -934,6 +1036,10 @@ final class GameScene: SKScene {
         case .heal: hp = stats.maxHP
         case .coins(let n): coinsCollected += n
         default: state.loadout.apply(o)
+        }
+        if case .weapon(let w, let l) = o, l >= evolvedLevel {
+            state.flash("EVOLVED: \(w.evolvedTitle.uppercased())!", seconds: 2.5)
+            Haptics.success()
         }
         rebuildWeapons()
         Sound.tap.play()

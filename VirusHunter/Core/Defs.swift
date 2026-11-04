@@ -25,8 +25,42 @@ enum WeaponKind: String, CaseIterable, Codable, Identifiable {
         case .bomb: return "cross.circle.fill"
         }
     }
+    /// Evolved form, reached at level `evolvedLevel` once the weapon is maxed and its partner passive is owned.
+    var evolvedTitle: String {
+        switch self {
+        case .laser: return "Photon Lance"
+        case .swarm: return "Hive Mind"
+        case .shield: return "Immune Wall"
+        case .field: return "Storm Field"
+        case .zap: return "Thunderstorm"
+        case .bomb: return "Cure Nova"
+        }
+    }
+    /// The passive that unlocks this weapon's evolution.
+    var partner: PassiveKind {
+        switch self {
+        case .laser: return .rapid
+        case .swarm: return .power
+        case .shield: return .maxHP
+        case .field: return .magnet
+        case .zap: return .speed
+        case .bomb: return .regen
+        }
+    }
+    func displayTitle(level l: Int) -> String { l >= evolvedLevel ? evolvedTitle : title }
+
     /// One-line description of what the next level gives.
     func detail(nextLevel l: Int) -> String {
+        if l >= evolvedLevel {
+            switch self {
+            case .laser: return "EVOLVE: 5 piercing photon bolts that pass through everything."
+            case .swarm: return "EVOLVE: 8 hunter bots with heavy damage."
+            case .shield: return "EVOLVE: 7 antibodies in a wide, crushing orbit."
+            case .field: return "EVOLVE: a huge storm aura that shreds viruses."
+            case .zap: return "EVOLVE: lightning jumps 11 times, twice as often."
+            case .bomb: return "EVOLVE: giant cure blasts every second."
+            }
+        }
         switch self {
         case .laser: return l == 1 ? "Fires at the nearest virus." : l == 5 ? "Bolts pierce through viruses." : "+damage, more bolts."
         case .swarm: return l == 1 ? "A mini-bot hunts viruses for you." : "+1 mini-bot, +damage."
@@ -91,6 +125,8 @@ enum UpgradeOption: Hashable, Identifiable {
 
 let maxWeapons = 4
 let maxLevel = 5
+/// Weapon "level 6": the evolved form.
+let evolvedLevel = 6
 
 /// What the player owns during one run.
 struct Loadout: Equatable {
@@ -117,6 +153,7 @@ struct Loadout: Equatable {
         for w in WeaponKind.allCases {
             let l = level(w)
             if l > 0, l < maxLevel { out.append(.weapon(w, toLevel: l + 1)) }
+            if l == maxLevel, level(w.partner) > 0 { out.append(.weapon(w, toLevel: evolvedLevel)) }
             if l == 0, weapons.count < maxWeapons { out.append(.weapon(w, toLevel: 1)) }
         }
         for p in PassiveKind.allCases where level(p) < maxLevel { out.append(.passive(p, toLevel: level(p) + 1)) }
@@ -127,7 +164,7 @@ struct Loadout: Equatable {
     func rollOptions<R: RandomNumberGenerator>(count: Int = 3, rng: inout R) -> [UpgradeOption] {
         var pool = candidates().map { o -> (UpgradeOption, Double) in
             switch o {
-            case .weapon(_, let l): return (o, l == 1 ? 1.1 : 1.6)
+            case .weapon(_, let l): return (o, l == 1 ? 1.1 : l >= evolvedLevel ? 4 : 1.6)
             case .passive: return (o, 0.8)
             default: return (o, 1)
             }
@@ -154,7 +191,7 @@ func xpToNext(_ level: Int) -> Int { 4 + 3 * level + Int(pow(Double(level), 1.5)
 
 enum EnemyKind: String, CaseIterable {
     case spiky, mini, blob, dart, spitter, elite
-    case bossSumo, bossCowboy, bossRoyal
+    case bossSumo, bossCowboy, bossRoyal, bossBrain, bossMarrow, bossVex
 
     struct Stats { let hp: Double; let speed: Double; let radius: Double; let damage: Double; let xp: Int }
 
@@ -169,14 +206,20 @@ enum EnemyKind: String, CaseIterable {
         case .bossSumo: return Stats(hp: 2000, speed: 46, radius: 62, damage: 26, xp: 60)
         case .bossCowboy: return Stats(hp: 1800, speed: 58, radius: 56, damage: 22, xp: 60)
         case .bossRoyal: return Stats(hp: 2300, speed: 42, radius: 60, damage: 24, xp: 60)
+        case .bossBrain: return Stats(hp: 2100, speed: 50, radius: 58, damage: 24, xp: 60)
+        case .bossMarrow: return Stats(hp: 2600, speed: 34, radius: 66, damage: 30, xp: 60)
+        case .bossVex: return Stats(hp: 3400, speed: 52, radius: 64, damage: 30, xp: 80)
         }
     }
-    var isBoss: Bool { self == .bossSumo || self == .bossCowboy || self == .bossRoyal }
+    var isBoss: Bool { [.bossSumo, .bossCowboy, .bossRoyal, .bossBrain, .bossMarrow, .bossVex].contains(self) }
     var texture: String {
         switch self {
         case .bossSumo: return "boss-sumo"
         case .bossCowboy: return "boss-cowboy"
         case .bossRoyal: return "boss-royal"
+        case .bossBrain: return "boss-brain"
+        case .bossMarrow: return "boss-marrow"
+        case .bossVex: return "king-vex"
         default: return "virus-\(rawValue)"
         }
     }
@@ -187,6 +230,9 @@ enum EnemyKind: String, CaseIterable {
         case .bossSumo: return "Sumo Virus"
         case .bossCowboy: return "Cowboy Virus"
         case .bossRoyal: return "Royal Guard"
+        case .bossBrain: return "Mind Leech"
+        case .bossMarrow: return "Bone Colossus"
+        case .bossVex: return "King Vex"
         default: return ""
         }
     }
@@ -208,12 +254,14 @@ struct Organ: Identifiable, Equatable {
         Organ(id: 1, name: "Lungs", key: "lungs", boss: .bossSumo, tagline: "Clear the airways."),
         Organ(id: 2, name: "Heart", key: "heart", boss: .bossCowboy, tagline: "Keep the blood flowing."),
         Organ(id: 3, name: "Stomach", key: "stomach", boss: .bossRoyal, tagline: "Acid and armies."),
-        Organ(id: 4, name: "Brain", key: "brain", boss: .bossSumo, tagline: "Save the mind."),
-        Organ(id: 5, name: "Bone Marrow", key: "marrow", boss: .bossCowboy, tagline: "The source of the swarm."),
+        Organ(id: 4, name: "Brain", key: "brain", boss: .bossBrain, tagline: "Save the mind."),
+        Organ(id: 5, name: "Bone Marrow", key: "marrow", boss: .bossMarrow, tagline: "The source of the swarm."),
     ]
     static let endless = Organ(id: 0, name: "Endless", key: "endless", boss: .bossRoyal, tagline: "How long can you last?")
 
     var isEndless: Bool { id == 0 }
+    /// The boss actually fought: King Vex waits in the Bone Marrow of the final city.
+    var finalBoss: EnemyKind { id == 5 && infection >= Organ.maxInfection ? .bossVex : boss }
     /// This organ at another Infection Level (clamped to 1...maxInfection).
     func at(infection level: Int) -> Organ { var o = self; o.infection = max(1, min(Organ.maxInfection, level)); return o }
     /// Extra steps above Infection Level 1.

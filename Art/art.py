@@ -121,6 +121,8 @@ def virus(kind, size=256, seed=1):
         "spitter": ("#FFF27A", "#E8C619", "#7A6400"),
         "mini": ("#FF9AAE", "#FF3D6A", "#8A0F2E"),
         "elite": ("#8AF2FF", "#14B8E6", "#0A4F7A"),
+        "brainv": ("#FFC9E6", "#FF6FB5", "#8A1D55"),
+        "bone": ("#FFFFFF", "#E6DCC4", "#7A6E55"),
     }[kind]
     light, mid, dark = pal
     c = size / 2
@@ -128,7 +130,7 @@ def virus(kind, size=256, seed=1):
     defs = f'''<radialGradient id="b{kind}" cx="36%" cy="30%" r="80%"><stop offset="0" stop-color="{light}"/><stop offset=".55" stop-color="{mid}"/><stop offset="1" stop-color="{dark}"/></radialGradient>
     <filter id="gl{kind}" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="{size*0.04}"/></filter>'''
     parts = [f'<circle cx="{c}" cy="{c}" r="{r*1.15}" fill="{mid}" opacity=".45" filter="url(#gl{kind})"/>']
-    n = {"spiky": 12, "blob": 0, "dart": 8, "spitter": 10, "mini": 8, "elite": 14}[kind]
+    n = {"spiky": 12, "blob": 0, "dart": 8, "spitter": 10, "mini": 8, "elite": 14, "brainv": 10, "bone": 10}[kind]
     for i in range(n):
         a = 2 * math.pi * i / n + rnd.uniform(-0.08, 0.08)
         L = r * (1.38 if kind != "dart" else 1.5)
@@ -177,7 +179,7 @@ def virus(kind, size=256, seed=1):
 
 
 def boss(kind, size=512):
-    base = {"sumo": "blob", "cowboy": "spiky", "royal": "elite"}[kind]
+    base = {"sumo": "blob", "cowboy": "spiky", "royal": "elite", "brain": "brainv", "marrow": "bone"}[kind]
     inner = virus(base, size, seed=7)
     inner = inner[inner.index("<defs>"):inner.rindex("</svg>")]
     c = size / 2
@@ -192,6 +194,23 @@ def boss(kind, size=512):
         <path d="M{c-100} {c-125} Q{c-95} {c-240} {c} {c-215} Q{c+95} {c-240} {c+100} {c-125} Z" fill="#A86B32" stroke="#4A2C10" stroke-width="8"/>
         <path d="M{c-98} {c-150} Q{c} {c-130} {c+98} {c-150}" stroke="#2A1A0A" stroke-width="16" fill="none"/>
         <path d="M{c-70} {c+150} L{c} {c+215} L{c+70} {c+150}" fill="#E23B3B" stroke="#7A1010" stroke-width="6"/>'''
+    elif kind == "brain":
+        # brain folds on top and a glowing third eye
+        folds = "".join(f'<path d="M{c-120+i*40} {c-60} Q{c-100+i*40} {c-130} {c-80+i*40} {c-70} Q{c-60+i*40} {c-140} {c-40+i*40} {c-80}" '
+                        f'stroke="#8A1D55" stroke-width="10" fill="none" stroke-linecap="round" opacity=".75"/>' for i in range(5))
+        extra = f'''<path d="M{c-150} {c-40} Q{c-150} {c-200} {c} {c-205} Q{c+150} {c-200} {c+150} {c-40} Q{c} {c-80} {c-150} {c-40} Z" fill="#FF9ACB" stroke="#8A1D55" stroke-width="8"/>
+        {folds}
+        <ellipse cx="{c}" cy="{c-150}" rx="30" ry="22" fill="#FFFFFF" stroke="#8A1D55" stroke-width="6"/><circle cx="{c}" cy="{c-150}" r="13" fill="#B23CFF"/><circle cx="{c+4}" cy="{c-154}" r="4" fill="#fff"/>
+        <circle cx="{c}" cy="{c-150}" r="44" fill="#E05CFF" opacity=".25"/>'''
+    elif kind == "marrow":
+        # bone horns, a cracked skull plate and bone spikes
+        extra = f'''<path d="M{c-120} {c-90} Q{c-210} {c-170} {c-190} {c-250} Q{c-150} {c-170} {c-80} {c-130} Z" fill="#F6F1E4" stroke="#7A6E55" stroke-width="8"/>
+        <path d="M{c+120} {c-90} Q{c+210} {c-170} {c+190} {c-250} Q{c+150} {c-170} {c+80} {c-130} Z" fill="#F6F1E4" stroke="#7A6E55" stroke-width="8"/>
+        <path d="M{c-110} {c-100} Q{c} {c-170} {c+110} {c-100} L{c+90} {c-60} Q{c} {c-110} {c-90} {c-60} Z" fill="#FFFFFF" stroke="#7A6E55" stroke-width="7"/>
+        <path d="M{c-20} {c-150} L{c} {c-120} L{c-15} {c-95} M{c+30} {c-140} L{c+18} {c-112}" stroke="#7A6E55" stroke-width="6" fill="none" stroke-linecap="round"/>
+        <rect x="{c-150}" y="{c+120}" width="300" height="34" rx="17" fill="#F6F1E4" stroke="#7A6E55" stroke-width="7"/>
+        <circle cx="{c-150}" cy="{c+120}" r="24" fill="#F6F1E4" stroke="#7A6E55" stroke-width="7"/><circle cx="{c-150}" cy="{c+154}" r="24" fill="#F6F1E4" stroke="#7A6E55" stroke-width="7"/>
+        <circle cx="{c+150}" cy="{c+120}" r="24" fill="#F6F1E4" stroke="#7A6E55" stroke-width="7"/><circle cx="{c+150}" cy="{c+154}" r="24" fill="#F6F1E4" stroke="#7A6E55" stroke-width="7"/>'''
     else:
         extra = f'''<path d="M{c-110} {c-120} L{c-90} {c-215} L{c-45} {c-150} L{c} {c-235} L{c+45} {c-150} L{c+90} {c-215} L{c+110} {c-120} Z" fill="#FFD34D" stroke="#9A6A00" stroke-width="8"/>
         <circle cx="{c}" cy="{c-185}" r="16" fill="#FF3D6A"/><circle cx="{c-80}" cy="{c-160}" r="11" fill="#3FE6FF"/><circle cx="{c+80}" cy="{c-160}" r="11" fill="#3FE6FF"/>
@@ -426,7 +445,7 @@ if __name__ == "__main__":
     items += skin_items()
     for k in ["spiky", "blob", "dart", "spitter", "mini", "elite"]:
         items.append((f"virus-{k}", virus(k, 256, seed=hash(k) % 100)))
-    for k in ["sumo", "cowboy", "royal"]:
+    for k in ["sumo", "cowboy", "royal", "brain", "marrow"]:
         items.append((f"boss-{k}", boss(k)))
     items += [("orb", orb()), ("orb-big", orb(96, "#FFE45C", "#FFFFE0")), ("coin", coin()), ("heart", heart()), ("chest", chest()),
               ("glow", glow()), ("glow-pink", glow(128, "#FF6BD5")), ("glow-gold", glow(128, "#FFE45C")), ("bolt", bolt()), ("bomb", bomb()), ("slime", slime())]
