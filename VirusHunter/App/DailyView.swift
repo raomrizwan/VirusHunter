@@ -69,7 +69,7 @@ struct DailyView: View {
                 }
             }
             if daily.canClaimStreak {
-                GameButton(title: "Claim \(daily.streakReward) coins", icon: "gift.fill", colors: [Theme.gold, Color(red: 0.95, green: 0.5, blue: 0.1)], height: 52) {
+                GameButton(title: "Claim \(daily.streakReward) coins", icon: "gift.fill", kind: .reward, height: 52) {
                     claim { $0.claimStreak() }
                 }
                 .accessibilityIdentifier("claimStreak")
@@ -107,7 +107,7 @@ struct DailyView: View {
                 }
                 .foregroundStyle(.white)
                 .frame(width: 78, height: 40)
-                .background(RoundedRectangle(cornerRadius: 12).fill(m.claimed ? Color.gray.opacity(0.4) : m.done ? Color(red: 0.1, green: 0.75, blue: 0.5) : .white.opacity(0.12)))
+                .background(RoundedRectangle(cornerRadius: 12).fill(m.claimed ? Color.gray.opacity(0.4) : m.done ? Color(red: 0.2, green: 0.6, blue: 1) : .white.opacity(0.12)))
             }
             .buttonStyle(PressStyle())
             .disabled(!m.done || m.claimed)

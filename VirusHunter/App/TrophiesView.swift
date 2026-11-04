@@ -88,7 +88,7 @@ struct TrophiesView: View {
                     else { HStack(spacing: 3) { Image("coin").resizable().frame(width: 16, height: 16); Text("\(t.reward.formatted())").font(Theme.body(13, .heavy)) } }
                 }
                 .foregroundStyle(.white).frame(width: 82, height: 40)
-                .background(RoundedRectangle(cornerRadius: 12).fill(claimed ? Color.gray.opacity(0.4) : done ? Color(red: 0.1, green: 0.75, blue: 0.5) : .white.opacity(0.1)))
+                .background(RoundedRectangle(cornerRadius: 12).fill(claimed ? Color.gray.opacity(0.4) : done ? Color(red: 0.2, green: 0.6, blue: 1) : .white.opacity(0.1)))
             }
             .buttonStyle(PressStyle())
             .disabled(!done || claimed)

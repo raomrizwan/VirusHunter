@@ -352,7 +352,7 @@ struct PauseView: View {
                 }
                 .padding(18).frame(maxWidth: .infinity, alignment: .leading).glass()
                 GameButton(title: "Resume", icon: "play.fill", action: onResume).accessibilityIdentifier("resumeButton")
-                GameButton(title: "Quit run", icon: "xmark", colors: [Color(white: 0.45), Color(white: 0.25)], height: 52, action: onQuit)
+                GameButton(title: "Quit run", icon: "xmark", kind: .secondary, height: 52, action: onQuit)
             }
             .padding(.horizontal, 30)
         }
@@ -377,7 +377,7 @@ struct DeadView: View {
                 if canRevive {
                     Text("\(count)").font(Theme.title(56)).foregroundStyle(Theme.gold).contentTransition(.numericText())
                     GameButton(title: freeRevive ? "Revive (free)" : "Revive", icon: freeRevive ? "arrow.counterclockwise" : "play.rectangle.fill",
-                               colors: [Theme.gold, Color(red: 0.95, green: 0.5, blue: 0.1)]) {
+                               kind: .reward) {
                         guard !reviving else { return }
                         reviving = true
                         onRevive()
@@ -442,7 +442,7 @@ struct ResultView: View {
                     }
                     .padding(.vertical, 4)
                     if !r.doubled && r.coins > 0 {
-                        GameButton(title: "Double coins", icon: "play.rectangle.fill", colors: [Theme.gold, Color(red: 0.95, green: 0.5, blue: 0.1)], height: 56, action: onDouble)
+                        GameButton(title: "Double coins", icon: "play.rectangle.fill", kind: .reward, height: 56, action: onDouble)
                             .accessibilityIdentifier("doubleButton")
                     }
                 }
@@ -459,7 +459,7 @@ struct ResultView: View {
                     GameButton(title: "Next: \(next.name) · \(save.country.city(next.infection))", icon: "arrow.right", action: onNext)
                         .accessibilityIdentifier("nextButton")
                 }
-                GameButton(title: "Continue", colors: [Color(white: 0.5), Color(white: 0.28)], height: 52, action: onDone)
+                GameButton(title: "Continue", kind: .secondary, height: 52, action: onDone)
                     .accessibilityIdentifier("continueButton")
             }
             .padding(.horizontal, 28).padding(.vertical, 20)
@@ -590,7 +590,7 @@ struct GoalCard: View {
                 GeometryReader { g in
                     ZStack(alignment: .leading) {
                         Capsule().fill(.black.opacity(0.45))
-                        Capsule().fill(LinearGradient(colors: [Theme.gold, Color(red: 0.95, green: 0.5, blue: 0.1)], startPoint: .leading, endPoint: .trailing))
+                        Capsule().fill(LinearGradient(kind: .reward, startPoint: .leading, endPoint: .trailing))
                             .frame(width: max(8, g.size.width * fill))
                     }
                 }

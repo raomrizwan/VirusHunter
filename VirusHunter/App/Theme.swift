@@ -42,31 +42,62 @@ struct GlassPanel: ViewModifier {
 extension View { func glass(_ r: CGFloat = 22) -> some View { modifier(GlassPanel(radius: r)) } }
 
 /// Big glossy game button.
+/// One button family for the whole game, in the neon look of the arena:
+/// `.primary` (cyan to blue, the main action), `.reward` (gold, coins and gifts) and
+/// `.secondary` (dark glass with a thin outline, for Continue, Quit, Close).
 struct GameButton: View {
+    enum Kind { case primary, reward, secondary }
     let title: String
     var icon: String?
-    var colors: [Color] = [Color(red: 0.35, green: 1, blue: 0.6), Color(red: 0.05, green: 0.7, blue: 0.45)]
+    var kind: Kind = .primary
     var height: CGFloat = 64
     var action: () -> Void
-    @State private var pressed = false
+
+    private var gradient: [Color] {
+        switch kind {
+        case .primary: return [Color(red: 0.3, green: 0.92, blue: 1), Color(red: 0.2, green: 0.45, blue: 1)]
+        case .reward: return [Color(red: 1, green: 0.86, blue: 0.35), Color(red: 1, green: 0.55, blue: 0.2)]
+        case .secondary: return [Color.white.opacity(0.10), Color.white.opacity(0.05)]
+        }
+    }
+    private var glow: Color {
+        switch kind {
+        case .primary: return Theme.cyan
+        case .reward: return Theme.gold
+        case .secondary: return .clear
+        }
+    }
+
     var body: some View {
+        let r = height * 0.32
         Button {
             Sound.tap.play(); Haptics.light(); action()
         } label: {
             HStack(spacing: 10) {
-                if let icon { Image(systemName: icon).font(.system(size: height * 0.34, weight: .heavy)) }
-                Text(title).font(Theme.title(height * 0.34)).textCase(.uppercase)
+                if let icon { Image(systemName: icon).font(.system(size: height * (kind == .secondary ? 0.28 : 0.32), weight: .heavy)) }
+                Text(title).font(Theme.title(height * (kind == .secondary ? 0.3 : 0.33))).textCase(.uppercase)
+                    .lineLimit(1).minimumScaleFactor(0.6)
             }
-            .foregroundStyle(.white)
-            .shadow(color: .black.opacity(0.35), radius: 0, y: 2)
+            .foregroundStyle(kind == .secondary ? Color.white.opacity(0.88) : .white)
+            .shadow(color: .black.opacity(kind == .secondary ? 0 : 0.3), radius: 2, y: 1)
+            .padding(.horizontal, 16)
             .frame(maxWidth: .infinity, minHeight: height)
             .background(
                 ZStack {
-                    RoundedRectangle(cornerRadius: height * 0.32, style: .continuous).fill(colors.last!.opacity(0.9)).offset(y: 5)
-                    RoundedRectangle(cornerRadius: height * 0.32, style: .continuous).fill(LinearGradient(colors: colors, startPoint: .top, endPoint: .bottom))
-                    RoundedRectangle(cornerRadius: height * 0.32, style: .continuous).fill(LinearGradient(colors: [.white.opacity(0.35), .clear], startPoint: .top, endPoint: .center)).padding(3)
+                    if kind == .secondary {
+                        RoundedRectangle(cornerRadius: r, style: .continuous).fill(.ultraThinMaterial).opacity(0.6)
+                    }
+                    RoundedRectangle(cornerRadius: r, style: .continuous)
+                        .fill(LinearGradient(colors: gradient, startPoint: .topLeading, endPoint: .bottomTrailing))
+                    // Glossy top edge
+                    RoundedRectangle(cornerRadius: r, style: .continuous)
+                        .fill(LinearGradient(colors: [.white.opacity(kind == .secondary ? 0.08 : 0.28), .clear], startPoint: .top, endPoint: .center))
+                        .padding(2)
+                    RoundedRectangle(cornerRadius: r, style: .continuous)
+                        .stroke(kind == .secondary ? Color.white.opacity(0.22) : Color.white.opacity(0.45), lineWidth: kind == .secondary ? 1 : 1.2)
                 }
             )
+            .shadow(color: glow.opacity(0.55), radius: 12, y: 3)
         }
         .buttonStyle(PressStyle())
     }

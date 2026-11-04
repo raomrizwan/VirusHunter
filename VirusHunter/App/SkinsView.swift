@@ -48,14 +48,14 @@ struct SkinsView: View {
     @ViewBuilder private var action: some View {
         let s = model.save
         if s.skin == selected {
-            GameButton(title: "Equipped", icon: "checkmark", colors: [Color(white: 0.45), Color(white: 0.25)], height: 56) {}
+            GameButton(title: "Equipped", icon: "checkmark", kind: .secondary, height: 56) {}
         } else if s.owns(selected) {
             GameButton(title: "Equip", icon: "tshirt.fill", height: 56) { model.save.equip(selected); model.persist() }
                 .accessibilityIdentifier("equipSkin")
         } else if let p = selected.price {
             let afford = s.coins >= p
             GameButton(title: "Buy \(p)", icon: "bitcoinsign.circle.fill",
-                       colors: afford ? [Theme.gold, Color(red: 0.95, green: 0.5, blue: 0.1)] : [Color(white: 0.45), Color(white: 0.25)], height: 56) {
+                       kind: afford ? .reward : .secondary, height: 56) {
                 if model.save.buy(selected) {
                     model.save.equip(selected); model.persist(); Sound.levelup.play(); Haptics.success()
                 } else { Haptics.error() }

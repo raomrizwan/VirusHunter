@@ -222,9 +222,9 @@ struct MapView: View {
                 Image(systemName: playable ? "play.fill" : "lock.fill").font(.system(size: 26, weight: .black)).foregroundStyle(.white)
                     .frame(width: 66, height: 66)
                     .background(Circle().fill(playable
-                        ? LinearGradient(colors: [Color(red: 0.35, green: 1, blue: 0.6), Color(red: 0.05, green: 0.7, blue: 0.45)], startPoint: .top, endPoint: .bottom)
-                        : LinearGradient(colors: [.gray, Color(white: 0.3)], startPoint: .top, endPoint: .bottom)))
-                    .shadow(color: Theme.lime.opacity(playable ? 0.6 : 0), radius: 10)
+                        ? LinearGradient(colors: [Color(red: 0.3, green: 0.92, blue: 1), Color(red: 0.2, green: 0.45, blue: 1)], startPoint: .topLeading, endPoint: .bottomTrailing)
+                        : LinearGradient(colors: [Color.white.opacity(0.14), Color.white.opacity(0.06)], startPoint: .top, endPoint: .bottom)))
+                    .shadow(color: Theme.cyan.opacity(playable ? 0.6 : 0), radius: 10)
             }
             .buttonStyle(PressStyle())
             .disabled(!playable)
@@ -350,7 +350,7 @@ struct LabView: View {
                 }
                 .foregroundStyle(.white)
                 .frame(width: 92, height: 42)
-                .background(RoundedRectangle(cornerRadius: 13).fill(maxed ? Color.gray.opacity(0.4) : !afford ? Color.white.opacity(0.12) : ranking ? Theme.magenta.opacity(0.85) : Color(red: 0.1, green: 0.75, blue: 0.5)))
+                .background(RoundedRectangle(cornerRadius: 13).fill(maxed ? Color.gray.opacity(0.4) : !afford ? Color.white.opacity(0.12) : ranking ? Theme.magenta.opacity(0.85) : Color(red: 0.2, green: 0.6, blue: 1)))
             }
             .disabled(maxed)
             .buttonStyle(PressStyle())

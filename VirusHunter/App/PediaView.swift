@@ -84,7 +84,7 @@ struct PediaView: View {
                 Text(e.group.rawValue.uppercased()).font(Theme.body(12, .heavy)).tracking(2).foregroundStyle(Theme.cyan)
                 Text(e.name).font(Theme.title(28)).foregroundStyle(.white).multilineTextAlignment(.center)
                 Text(e.line).font(Theme.body(16, .medium)).foregroundStyle(Theme.muted).multilineTextAlignment(.center)
-                GameButton(title: "Close", colors: [Color(white: 0.5), Color(white: 0.28)], height: 50) { withAnimation { selected = nil } }
+                GameButton(title: "Close", kind: .secondary, height: 50) { withAnimation { selected = nil } }
             }
             .padding(24).frame(maxWidth: 380)
             .background(RoundedRectangle(cornerRadius: 26).fill(Theme.bg.opacity(0.97)))

@@ -40,7 +40,7 @@ struct SeasonView: View {
                         .font(Theme.body(12)).foregroundStyle(Theme.muted).frame(maxWidth: .infinity, alignment: .leading)
                     if s.unclaimedSeasonTiers > 0 {
                         GameButton(title: "Claim \(s.unclaimedSeasonTiers) reward\(s.unclaimedSeasonTiers == 1 ? "" : "s")", icon: "gift.fill",
-                                   colors: [Theme.gold, Color(red: 0.95, green: 0.5, blue: 0.1)], height: 52) {
+                                   kind: .reward, height: 52) {
                             var ns = model.save
                             _ = ns.claimSeason()
                             model.save = ns; model.persist()
