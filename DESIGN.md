@@ -77,6 +77,11 @@ an arrival scene per city 2-10 on the map, a finale after city 10, Endless intro
 - Random events: Golden Virus (flees, 15 s, 30 coins, trophy), supply-drop chest, King Vex ambush from city 3 (survive 20 s, +40).
 - One bonus objective per run (+60): no damage 45 s, 250 kills by 3:00, boss in 45 s, open 3 chests.
 
+### Boss lineups and special viruses (`Core/Bosses.swift`)
+- City 1 plays the classic lineup. From city 2 on, each city shuffles which boss guards which organ (seeded by country + city) and gives each a different variant: **Frost** (shots chill and slow Nano, ice rings), **Toxic** (leaves puddles), **Inferno** (double fire rings), **Shadow** (turns invisible and faster), **Mega** (1.5x HP, bigger, calls two elites at half health). The HUD shows e.g. "Toxic Sumo Virus". King Vex stays the final boss.
+- Four special viruses: **Bomber** (stops next to Nano, 0.8 s fuse, blast also hurts viruses), **Healer** (keeps away, heals nearby viruses 30% every 3 s), **Sniper** (holds 300-380 away, red aim line, then a fast shot), **Spore** (weaving clusters).
+- Each organ has a signature special (Lungs Spore, Heart Bomber, Stomach Healer, Brain Sniper, Bone Marrow two random); city 2+ adds a guest special and city 6+ another, picked per country. Endless uses all four.
+
 ### City rewards (kept secret until earned)
 City 1: 1,250 coins · 2: **Freeze Ray** weapon (frost wave, slows; evolves with DNA Magnet into Absolute Zero) · 3: **Frost Nano** skin ·
 4: **Homing Missiles** weapon (steer + explode; evolves with Overcharge into Rocket Storm) · 5: **Plasma Nano** skin ·

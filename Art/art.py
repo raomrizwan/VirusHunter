@@ -132,6 +132,10 @@ def virus(kind, size=256, seed=1):
         "elite": ("#8AF2FF", "#14B8E6", "#0A4F7A"),
         "brainv": ("#FFC9E6", "#FF6FB5", "#8A1D55"),
         "bone": ("#FFFFFF", "#E6DCC4", "#7A6E55"),
+        "bomber": ("#FFB08A", "#FF5A1F", "#8A1A00"),
+        "healer": ("#C8FFD8", "#3FE07A", "#0F6B33"),
+        "sniper": ("#FF9AA0", "#E0202E", "#5E0710"),
+        "spore": ("#F0E6FF", "#B9A2F5", "#5B4596"),
     }[kind]
     light, mid, dark = pal
     c = size / 2
@@ -139,7 +143,8 @@ def virus(kind, size=256, seed=1):
     defs = f'''<radialGradient id="b{kind}" cx="36%" cy="30%" r="80%"><stop offset="0" stop-color="{light}"/><stop offset=".55" stop-color="{mid}"/><stop offset="1" stop-color="{dark}"/></radialGradient>
     <filter id="gl{kind}" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="{size*0.04}"/></filter>'''
     parts = [f'<circle cx="{c}" cy="{c}" r="{r*1.15}" fill="{mid}" opacity=".45" filter="url(#gl{kind})"/>']
-    n = {"spiky": 12, "blob": 0, "dart": 8, "spitter": 10, "mini": 8, "elite": 14, "brainv": 10, "bone": 10}[kind]
+    n = {"spiky": 12, "blob": 0, "dart": 8, "spitter": 10, "mini": 8, "elite": 14, "brainv": 10, "bone": 10,
+         "bomber": 6, "healer": 8, "sniper": 8, "spore": 16}[kind]
     for i in range(n):
         a = 2 * math.pi * i / n + rnd.uniform(-0.08, 0.08)
         L = r * (1.38 if kind != "dart" else 1.5)
@@ -182,6 +187,28 @@ def virus(kind, size=256, seed=1):
     parts.append(f'<path d="M{c-r*0.2} {my+r*0.02} L{c-r*0.12} {my+r*0.12} L{c-r*0.04} {my+r*0.03} M{c+r*0.04} {my+r*0.03} L{c+r*0.12} {my+r*0.12} L{c+r*0.2} {my+r*0.02}" fill="#fff"/>')
     # gloss
     parts.append(f'<ellipse cx="{c-r*0.38}" cy="{c-r*0.55}" rx="{r*0.32}" ry="{r*0.15}" fill="#fff" opacity=".45" transform="rotate(-30 {c-r*0.38} {c-r*0.55})"/>')
+    if kind == "bomber":
+        # fuse and spark on top, a hazard band across the body
+        parts.append(f'<path d="M{c+r*0.15} {c-r*0.95} Q{c+r*0.45} {c-r*1.35} {c+r*0.2} {c-r*1.55}" stroke="#3A2A1A" stroke-width="{size*0.03}" fill="none" stroke-linecap="round"/>')
+        parts.append(f'<circle cx="{c+r*0.2}" cy="{c-r*1.58}" r="{size*0.05}" fill="#FFE45C"/><circle cx="{c+r*0.2}" cy="{c-r*1.58}" r="{size*0.025}" fill="#fff"/>')
+        parts.append(f'<path d="M{c-r*0.8} {c+r*0.72} Q{c} {c+r*0.95} {c+r*0.8} {c+r*0.72}" stroke="#FFE45C" stroke-width="{size*0.03}" fill="none" stroke-dasharray="{size*0.04} {size*0.03}"/>')
+    if kind == "healer":
+        # halo and a white cross
+        parts.append(f'<ellipse cx="{c}" cy="{c-r*1.22}" rx="{r*0.55}" ry="{r*0.16}" fill="none" stroke="#FFF6A8" stroke-width="{size*0.025}"/>')
+        cx, cy, k = c + r*0.62, c + r*0.62, r*0.15
+        parts.append(f'<circle cx="{cx}" cy="{cy}" r="{k*2.2}" fill="#fff" stroke="{dark}" stroke-width="{size*0.01}"/>')
+        parts.append(f'<path d="M{cx-k*1.3} {cy} H{cx+k*1.3} M{cx} {cy-k*1.3} V{cy+k*1.3}" stroke="#2BC864" stroke-width="{k*0.8}" stroke-linecap="round"/>')
+    if kind == "sniper":
+        # scope over one eye and a crosshair badge
+        ex2, ey2 = c + r*0.36, c - r*0.08
+        parts.append(f'<circle cx="{ex2}" cy="{ey2}" r="{r*0.34}" fill="none" stroke="#2A2A33" stroke-width="{size*0.03}"/>')
+        parts.append(f'<path d="M{ex2+r*0.34} {ey2} L{c+r*1.05} {ey2-r*0.25}" stroke="#2A2A33" stroke-width="{size*0.03}" stroke-linecap="round"/>')
+        parts.append(f'<path d="M{ex2-r*0.42} {ey2} H{ex2+r*0.42} M{ex2} {ey2-r*0.42} V{ey2+r*0.42}" stroke="#FF3D4A" stroke-width="{size*0.008}"/>')
+    if kind == "spore":
+        # fluffy puffs around the body
+        for i in range(8):
+            a = 2 * math.pi * i / 8 + 0.2
+            parts.insert(1, f'<circle cx="{c+math.cos(a)*r*1.05}" cy="{c+math.sin(a)*r*1.05}" r="{r*0.28}" fill="{light}" opacity=".55"/>')
     if kind == "elite":
         parts.insert(0, f'<circle cx="{c}" cy="{c}" r="{r*1.55}" fill="none" stroke="#FFE45C" stroke-width="{size*0.02}" stroke-dasharray="{size*0.05} {size*0.035}" opacity=".9"/>')
     return wrap("".join(parts), size, size, defs)
@@ -452,7 +479,7 @@ if __name__ == "__main__":
         items.append((f"nano-{e}", nano(e, 512)))
     items.append(("minibot", minibot()))
     items += skin_items()
-    for k in ["spiky", "blob", "dart", "spitter", "mini", "elite"]:
+    for k in ["spiky", "blob", "dart", "spitter", "mini", "elite", "bomber", "healer", "sniper", "spore"]:
         items.append((f"virus-{k}", virus(k, 256, seed=hash(k) % 100)))
     for k in ["sumo", "cowboy", "royal", "brain", "marrow"]:
         items.append((f"boss-{k}", boss(k)))

@@ -280,4 +280,53 @@ final class CoreTests: XCTestCase {
         XCTAssertTrue(s.owns(.frost))
         XCTAssertGreaterThan(WeaponStats.missile(evolvedLevel).damage, WeaponStats.missile(1).damage)
     }
+
+    func testFirstCityKeepsClassicBosses() {
+        for o in Organ.all {
+            let b = o.bossSetup(country: "PK")
+            XCTAssertEqual(b.kind, o.boss)
+            XCTAssertEqual(b.variant, .normal)
+            XCTAssertEqual(b.title, o.boss.bossTitle)
+        }
+        XCTAssertEqual(Organ.all[4].at(infection: 10).bossSetup(country: "PK").kind, .bossVex)
+    }
+
+    func testEachLaterCityHasFiveDifferentBossFights() {
+        for country in ["PK", "US", "WORLD"] {
+            var lineups = Set<[EnemyKind]>()
+            for lv in 2...9 {
+                let setups = Organ.all.map { $0.at(infection: lv).bossSetup(country: country) }
+                XCTAssertEqual(Set(setups.map(\.kind)).count, 5, "\(country) city \(lv) bosses")
+                XCTAssertEqual(Set(setups.map(\.variant)).count, 5, "\(country) city \(lv) variants")
+                XCTAssertFalse(setups.contains { $0.variant == .normal })
+                XCTAssertTrue(setups.allSatisfy { $0.title.hasPrefix($0.variant.prefix + " ") })
+                lineups.insert(setups.map(\.kind))
+            }
+            XCTAssertGreaterThan(lineups.count, 3, "\(country) cities should not all repeat one lineup")
+        }
+        // Same city, same lineup (a retry is fair); another country plays it differently somewhere.
+        let a = Organ.all[0].at(infection: 4).bossSetup(country: "PK")
+        XCTAssertEqual(a, Organ.all[0].at(infection: 4).bossSetup(country: "PK"))
+        let pk = (2...9).flatMap { lv in Organ.all.map { $0.at(infection: lv).bossSetup(country: "PK") } }
+        let us = (2...9).flatMap { lv in Organ.all.map { $0.at(infection: lv).bossSetup(country: "US") } }
+        XCTAssertNotEqual(pk, us)
+    }
+
+    func testOrgansHaveSignatureVirusesAndCityGuests() {
+        XCTAssertEqual(Organ.all.compactMap(\.signature), [.spore, .bomber, .healer, .sniper])
+        for o in Organ.all {
+            let first = o.extraKinds(country: "PK")
+            if let sig = o.signature { XCTAssertEqual(first, [sig]) } else { XCTAssertEqual(first.count, 2) }
+            let later = o.at(infection: 7).extraKinds(country: "PK")
+            XCTAssertEqual(later.count, first.count + 2)
+            XCTAssertEqual(Set(later).count, later.count)
+            XCTAssertTrue(later.allSatisfy { EnemyKind.specials.contains($0) })
+        }
+        XCTAssertEqual(Set(Organ.endless.extraKinds(country: "PK")), Set(EnemyKind.specials))
+        // Specials join the mix after the opening seconds.
+        XCTAssertFalse(Spawner.kinds(time: 10, extra: [.sniper]).contains { $0.0 == .sniper })
+        XCTAssertTrue(Spawner.kinds(time: 40, extra: [.sniper]).contains { $0.0 == .sniper })
+        let p = PlayerStats.make(save: SaveData(), loadout: Loadout())
+        for kind in EnemyKind.specials { XCTAssertGreaterThan(p.speed, kind.base.speed * 1.12 * 1.75, "\(kind)") }
+    }
 }

@@ -207,6 +207,7 @@ func xpToNext(_ level: Int) -> Int { 4 + 3 * level + Int(pow(Double(level), 1.5)
 
 enum EnemyKind: String, CaseIterable {
     case spiky, mini, blob, dart, spitter, elite
+    case bomber, healer, sniper, spore
     case bossSumo, bossCowboy, bossRoyal, bossBrain, bossMarrow, bossVex
 
     struct Stats { let hp: Double; let speed: Double; let radius: Double; let damage: Double; let xp: Int }
@@ -219,6 +220,10 @@ enum EnemyKind: String, CaseIterable {
         case .dart: return Stats(hp: 18, speed: 55, radius: 15, damage: 12, xp: 2)
         case .spitter: return Stats(hp: 22, speed: 52, radius: 16, damage: 8, xp: 2)
         case .elite: return Stats(hp: 240, speed: 58, radius: 30, damage: 18, xp: 15)
+        case .bomber: return Stats(hp: 20, speed: 80, radius: 16, damage: 10, xp: 2)
+        case .healer: return Stats(hp: 30, speed: 48, radius: 17, damage: 8, xp: 3)
+        case .sniper: return Stats(hp: 20, speed: 50, radius: 15, damage: 8, xp: 3)
+        case .spore: return Stats(hp: 8, speed: 72, radius: 11, damage: 6, xp: 1)
         case .bossSumo: return Stats(hp: 2000, speed: 46, radius: 62, damage: 26, xp: 60)
         case .bossCowboy: return Stats(hp: 1800, speed: 58, radius: 56, damage: 22, xp: 60)
         case .bossRoyal: return Stats(hp: 2300, speed: 42, radius: 60, damage: 24, xp: 60)
@@ -252,6 +257,10 @@ enum EnemyKind: String, CaseIterable {
         default: return ""
         }
     }
+    /// The four special viruses that change how a stage plays (see `Organ.extraKinds`).
+    static let specials: [EnemyKind] = [.bomber, .healer, .sniper, .spore]
+    /// Bosses that can lead an outbreak (King Vex only appears at the very end).
+    static let bossRoster: [EnemyKind] = [.bossSumo, .bossCowboy, .bossRoyal, .bossBrain, .bossMarrow]
 }
 
 // MARK: - Stages (organs)
@@ -307,19 +316,21 @@ enum Spawner {
         return min(18 * organ.spawnScale, base * (1 + t / 32) * warmup * organ.spawnScale)
     }
 
-    static func kinds(time t: Double) -> [(EnemyKind, Double)] {
+    /// `extra`: the stage's special viruses (signature first), joining the mix over time.
+    static func kinds(time t: Double, extra: [EnemyKind] = []) -> [(EnemyKind, Double)] {
         var k: [(EnemyKind, Double)] = [(.spiky, 6), (.mini, 2)]
         if t > 50 { k.append((.dart, 2.5)) }
         if t > 100 { k.append((.blob, 2)) }
         if t > 130 { k.append((.spitter, 1.6)) }
+        for (i, kind) in extra.enumerated() where t > 30 + 45 * Double(i) { k.append((kind, i == 0 ? 1.8 : 1.3)) }
         return k
     }
 
     /// Health multiplier from elapsed time.
     static func healthScale(time t: Double) -> Double { 1 + 0.22 * (t / 60) + 0.05 * pow(t / 60, 2) }
 
-    static func pick<R: RandomNumberGenerator>(time t: Double, rng: inout R) -> EnemyKind {
-        let k = kinds(time: t)
+    static func pick<R: RandomNumberGenerator>(time t: Double, extra: [EnemyKind] = [], rng: inout R) -> EnemyKind {
+        let k = kinds(time: t, extra: extra)
         let total = k.reduce(0) { $0 + $1.1 }
         var x = Double.random(in: 0..<total, using: &rng)
         for (kind, w) in k { x -= w; if x < 0 { return kind } }

@@ -194,14 +194,15 @@ struct MapView: View {
     private func card(_ o: Organ) -> some View {
         let playable = model.save.canPlay(o.id, level: o.infection)
         let cleared = model.save.clearedInfection(o.id) >= o.infection
+        let bossSetup = o.bossSetup(country: model.save.country.id)
         return HStack(spacing: 14) {
-            Image(o.finalBoss.texture).resizable().frame(width: 84, height: 84).shadow(color: Theme.magenta.opacity(0.5), radius: 10)
+            Image(bossSetup.kind.texture).resizable().frame(width: 84, height: 84).shadow(color: Theme.magenta.opacity(0.5), radius: 10)
             VStack(alignment: .leading, spacing: 4) {
                 Text(o.infection == 1 ? Story.chapter(o.id).uppercased() : "MUTATED STRAIN · LEVEL \(o.infection)")
                     .font(Theme.body(11, .heavy)).foregroundStyle(o.infection == 1 ? Theme.cyan : Theme.magenta).tracking(1.5)
                     .lineLimit(1).minimumScaleFactor(0.7)
                 Text(o.name).font(Theme.title(26)).foregroundStyle(.white)
-                Text("Boss: \(o.finalBoss.bossTitle)").font(Theme.body(14)).foregroundStyle(Theme.muted)
+                Text("Boss: \(bossSetup.title)").font(Theme.body(14)).foregroundStyle(Theme.muted)
                 if o.infection > 1 {
                     Text("Viruses +\(Int((o.difficulty / o.at(infection: 1).difficulty - 1) * 100))% stronger · \(String(format: "%.1f", Double(o.coinReward) / Double(o.at(infection: 1).coinReward)))x coins")
                         .font(Theme.body(12, .medium)).foregroundStyle(Theme.muted).lineLimit(1).minimumScaleFactor(0.7)
