@@ -475,6 +475,58 @@ def mini_boss(name, size=384):
     return add_layers(svg, back, front)
 
 
+# ---------------------------------------------------------------- continent villains (King Vex's lieutenants)
+VILLAINS = {
+    "vira": ("blob", ("#FFC0F0", "#D23CB8", "#4A0A42")),
+    "sultan": ("spiky", ("#FFE6A8", "#E0A030", "#6A4206")),
+    "baron": ("elite", ("#D8F0C8", "#6A9A50", "#22381A")),
+    "general": ("spitter", ("#D8DCA0", "#7A8A30", "#2A3208")),
+}
+
+
+def villain(name, size=512):
+    base, pal = VILLAINS[name]
+    svg = recolor(virus(base, size, seed=21), KIND_PAL[base], pal)
+    c = size / 2
+    back, front = [], []
+    if name == "vira":
+        # tall crown, flowing veil, jewel
+        back.append(f'<path d="M{c-150} {c-90} Q{c-230} {c+120} {c-170} {c+230} L{c+170} {c+230} Q{c+230} {c+120} {c+150} {c-90} Z" fill="#7A1A6A" opacity=".4"/>')
+        front.append(f'<path d="M{c-95} {c-120} L{c-110} {c-235} L{c-55} {c-170} L{c-25} {c-250} L{c} {c-180} L{c+25} {c-250} L{c+55} {c-170} L{c+110} {c-235} L{c+95} {c-120} Z" fill="#FFD34D" stroke="#8A5A00" stroke-width="8"/>')
+        for x, y, col in ((c, c-195, "#3FE6FF"), (c-78, c-170, "#FF3D6A"), (c+78, c-170, "#FF3D6A")):
+            front.append(f'<circle cx="{x}" cy="{y}" r="13" fill="{col}" stroke="#fff" stroke-width="3"/>')
+        front.append(f'<path d="M{c-60} {c+60} Q{c} {c+40} {c+60} {c+60}" stroke="#FFD34D" stroke-width="7" fill="none"/>')
+    elif name == "sultan":
+        # turban with a jewel and feather, curly mustache
+        front.append(f'<path d="M{c-135} {c-95} Q{c-150} {c-230} {c} {c-235} Q{c+150} {c-230} {c+135} {c-95} Q{c} {c-140} {c-135} {c-95} Z" fill="#F4F0E6" stroke="#8A7A50" stroke-width="8"/>')
+        for k in range(3):
+            front.append(f'<path d="M{c-125} {c-125-k*35} Q{c} {c-165-k*35} {c+125} {c-125-k*35}" stroke="#C8B890" stroke-width="5" fill="none"/>')
+        front.append(f'<circle cx="{c}" cy="{c-150}" r="20" fill="#3FE6FF" stroke="#C89A20" stroke-width="7"/>')
+        front.append(f'<path d="M{c+5} {c-165} Q{c+60} {c-240} {c+25} {c-250} Q{c+30} {c-215} {c+5} {c-165} Z" fill="#E0303A"/>')
+        front.append(f'<path d="M{c} {c+38} Q{c-50} {c+20} {c-75} {c+55} Q{c-90} {c+25} {c-60} {c+18} M{c} {c+38} Q{c+50} {c+20} {c+75} {c+55} Q{c+90} {c+25} {c+60} {c+18}" stroke="#3A2206" stroke-width="12" fill="none" stroke-linecap="round"/>')
+    elif name == "baron":
+        # top hat, monocle and handlebar mustache
+        front.append(f'<rect x="{c-75}" y="{c-245}" width="150" height="125" rx="12" fill="#1A1A22" stroke="#000" stroke-width="6"/>')
+        front.append(f'<rect x="{c-75}" y="{c-160}" width="150" height="26" fill="#A01A2A"/>')
+        front.append(f'<ellipse cx="{c}" cy="{c-128}" rx="150" ry="26" fill="#22222C" stroke="#000" stroke-width="6"/>')
+        front.append(f'<circle cx="{c+55}" cy="{c-22}" r="38" fill="#CFF6FF" opacity=".35" stroke="#C8A030" stroke-width="7"/>')
+        front.append(f'<path d="M{c+93} {c-22} Q{c+120} {c+60} {c+90} {c+120}" stroke="#C8A030" stroke-width="4" fill="none"/>')
+        front.append(f'<path d="M{c} {c+40} Q{c-55} {c+15} {c-90} {c+45} Q{c-100} {c+10} {c-70} {c+5} M{c} {c+40} Q{c+55} {c+15} {c+90} {c+45} Q{c+100} {c+10} {c+70} {c+5}" stroke="#2A1A0A" stroke-width="13" fill="none" stroke-linecap="round"/>')
+    elif name == "general":
+        # peaked military cap with a star, medals and epaulettes
+        front.append(f'<path d="M{c-140} {c-110} Q{c-120} {c-250} {c} {c-255} Q{c+120} {c-250} {c+140} {c-110} Z" fill="#4A5A20" stroke="#1A2208" stroke-width="8"/>')
+        front.append(f'<path d="M{c-160} {c-110} Q{c} {c-60} {c+160} {c-110} Q{c} {c-85} {c-160} {c-110} Z" fill="#1A1A10"/>')
+        front.append(f'<rect x="{c-140}" y="{c-140}" width="280" height="22" fill="#C8A030"/>')
+        star = " ".join(f"{c + math.cos(-math.pi/2 + k*math.pi/5) * (34 if k % 2 == 0 else 14)},{c-195 + math.sin(-math.pi/2 + k*math.pi/5) * (34 if k % 2 == 0 else 14)}" for k in range(10))
+        front.append(f'<polygon points="{star}" fill="#FFD34D" stroke="#8A5A00" stroke-width="4"/>')
+        for i, col in enumerate(("#E0303A", "#3F8AE6", "#FFD34D")):
+            x = c - 70 + i * 34
+            front.append(f'<rect x="{x-10}" y="{c+95}" width="20" height="22" fill="{col}"/><circle cx="{x}" cy="{c+130}" r="13" fill="#FFD34D" stroke="#8A5A00" stroke-width="3"/>')
+        for sx in (-1, 1):
+            front.append(f'<rect x="{c+sx*165-35}" y="{c-30}" width="70" height="22" rx="8" fill="#C8A030" stroke="#6A4A00" stroke-width="4"/>')
+    return add_layers(svg, back, front)
+
+
 # ---------------------------------------------------------------- allies + mission props
 def ally(name, size=256):
     """Dr. Leuko's white blood cell helpers: a friendly round cell with a role badge."""
@@ -834,6 +886,8 @@ if __name__ == "__main__":
             items.append((f"virus-{k}-{st}", strain_virus(k, st)))
     for m in MINI_BOSSES:
         items.append((f"miniboss-{m}", mini_boss(m)))
+    for v in VILLAINS:
+        items.append((f"villain-{v}", villain(v)))
     for a in ["medic", "guardian", "hunter"]:
         items.append((f"ally-{a}", ally(a)))
     items.append(("bed", bed()))

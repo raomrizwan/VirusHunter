@@ -26,7 +26,7 @@ enum Pedia {
             }
         }
         for k in EnemyKind.miniBosses { out.append(PediaEntry(id: k.texture, name: k.miniTitle, group: .minis, line: k.pediaLine)) }
-        for k in EnemyKind.bossRoster + [.bossVex] { out.append(PediaEntry(id: k.texture, name: k.bossTitle, group: .bosses, line: k.pediaLine)) }
+        for k in EnemyKind.bossRoster + EnemyKind.villains + [.bossVex] { out.append(PediaEntry(id: k.texture, name: k.bossTitle, group: .bosses, line: k.pediaLine)) }
         for k in EnemyKind.bossRoster {
             for v in BossVariant.twists {
                 let b = BossSetup(kind: k, variant: v)
@@ -96,6 +96,10 @@ extension EnemyKind {
         case .bossBrain: return "Spins psychic spirals and teleports next to you."
         case .bossMarrow: return "Throws bone spears. Gets faster when hurt."
         case .bossVex: return "The virus king himself. Enrages at half health."
+        case .bossVira: return "Rules Asia for King Vex. Spirals, swarms of minis, and healers on call."
+        case .bossSultan: return "Rules the desert lands. Sandstorms pull you in while spores rain down."
+        case .bossBaron: return "Rules Europe. Hides in armor, then bursts out with a ring of shots."
+        case .bossGeneral: return "Rules the Americas. Missile barrages and an army of snipers and bombers."
         }
     }
 }

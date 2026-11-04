@@ -189,6 +189,14 @@ enum Story {
         let m = CityMutation.forCity(c, country: save.country.id)
         let warning = StoryLine(speaker: .leuko, text: "Careful, Nano. Scans show a \(m.title) here: \(m.detail)")
         var extra = [warning]
+        if c == Country.villainCity {
+            let v = save.country.villain
+            extra += [
+                StoryLine(speaker: .leuko, text: "Bad news. King Vex didn't come here himself. He sent \(v.bossTitle), the ruler of this part of the world."),
+                StoryLine(speaker: .vex, text: "My \(v.bossTitle) waits in the bone marrow. Nobody gets past my lieutenants."),
+                StoryLine(speaker: .nano, text: "Then I'll go through."),
+            ]
+        }
         if let strain = VirusStrain.forCity(c, country: save.country.id) {
             extra.append(StoryLine(speaker: .nano, text: "The viruses here look different. Is that a new army?"))
             extra.append(StoryLine(speaker: .vex, text: "Meet my \(strain.title)! Bred just for this city."))

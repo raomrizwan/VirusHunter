@@ -37,7 +37,7 @@ extension Organ {
     /// City 1 and Endless are always normal. From city 2, one organ per city is Hospital Defense,
     /// and from city 3 another is Escape (King Vex's final fight stays normal).
     func mode(country: String) -> RunMode {
-        guard !isEndless, !isBossRush, infection >= 2, finalBoss != .bossVex else { return .normal }
+        guard !isSideMode, infection >= 2, finalBoss != .bossVex, !(id == 5 && infection == Country.villainCity) else { return .normal }
         var rng = SeededRNG(seed: country.utf8.reduce(UInt64(77_017) &+ UInt64(infection) &* 613) { ($0 &* 131) &+ UInt64($1) })
         let order = [1, 2, 3, 4, 5].shuffled(using: &rng)
         if id == order[0] { return .defense }

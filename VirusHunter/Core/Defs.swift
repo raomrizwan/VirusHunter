@@ -210,6 +210,7 @@ enum EnemyKind: String, CaseIterable {
     case bomber, healer, sniper, spore
     case miniQueen, miniTurret, miniRhino, miniMagnet
     case bossSumo, bossCowboy, bossRoyal, bossBrain, bossMarrow, bossVex
+    case bossVira, bossSultan, bossBaron, bossGeneral
 
     struct Stats { let hp: Double; let speed: Double; let radius: Double; let damage: Double; let xp: Int }
 
@@ -235,9 +236,13 @@ enum EnemyKind: String, CaseIterable {
         case .bossBrain: return Stats(hp: 2100, speed: 50, radius: 58, damage: 24, xp: 60)
         case .bossMarrow: return Stats(hp: 2600, speed: 34, radius: 66, damage: 30, xp: 60)
         case .bossVex: return Stats(hp: 3400, speed: 52, radius: 64, damage: 30, xp: 80)
+        case .bossVira, .bossSultan, .bossBaron, .bossGeneral: return Stats(hp: 3000, speed: 48, radius: 62, damage: 28, xp: 70)
         }
     }
-    var isBoss: Bool { [.bossSumo, .bossCowboy, .bossRoyal, .bossBrain, .bossMarrow, .bossVex].contains(self) }
+    var isBoss: Bool { [.bossSumo, .bossCowboy, .bossRoyal, .bossBrain, .bossMarrow, .bossVex].contains(self) || isVillain }
+    /// King Vex's continent lieutenants (the boss of each country's fifth city).
+    var isVillain: Bool { [.bossVira, .bossSultan, .bossBaron, .bossGeneral].contains(self) }
+    static let villains: [EnemyKind] = [.bossVira, .bossSultan, .bossBaron, .bossGeneral]
     var texture: String {
         switch self {
         case .bossSumo: return "boss-sumo"
@@ -246,6 +251,10 @@ enum EnemyKind: String, CaseIterable {
         case .bossBrain: return "boss-brain"
         case .bossMarrow: return "boss-marrow"
         case .bossVex: return "king-vex"
+        case .bossVira: return "villain-vira"
+        case .bossSultan: return "villain-sultan"
+        case .bossBaron: return "villain-baron"
+        case .bossGeneral: return "villain-general"
         case .miniQueen: return "miniboss-queen"
         case .miniTurret: return "miniboss-turret"
         case .miniRhino: return "miniboss-rhino"
@@ -275,6 +284,10 @@ enum EnemyKind: String, CaseIterable {
         case .bossBrain: return "Mind Leech"
         case .bossMarrow: return "Bone Colossus"
         case .bossVex: return "King Vex"
+        case .bossVira: return "Queen Vira"
+        case .bossSultan: return "Sultan Spore"
+        case .bossBaron: return "Baron Bacter"
+        case .bossGeneral: return "General Germ"
         default: return ""
         }
     }

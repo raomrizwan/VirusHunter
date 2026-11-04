@@ -69,6 +69,7 @@ extension Organ {
     func bossSetup(country: String) -> BossSetup {
         if isSideMode { return BossSetup(kind: boss, variant: .normal) }
         if finalBoss == .bossVex { return BossSetup(kind: .bossVex, variant: .normal) }
+        if id == 5, infection == Country.villainCity { return BossSetup(kind: Country.find(country).villain, variant: .normal) }
         guard infection >= 2 else { return BossSetup(kind: boss, variant: .normal) }
         var rng = citySeed(country, infection, salt: 7_919)
         let kinds = EnemyKind.bossRoster.shuffled(using: &rng)

@@ -47,6 +47,19 @@ struct Country: Identifiable, Equatable {
     /// People infected when the outbreak reaches a city (grows city by city).
     static func outbreakSize(_ level: Int) -> Int { 8_000 + 12_000 * max(1, level) + 1_700 * ((level * 7) % 5) }
 
+    /// King Vex's lieutenant ruling this part of the world: the boss of the fifth city's Bone Marrow.
+    var villain: EnemyKind {
+        switch id {
+        case "PK", "IN", "BD", "ID": return .bossVira       // Asia
+        case "SA", "AE", "TR", "EG": return .bossSultan     // Middle East & North Africa
+        case "GB", "DE": return .bossBaron                  // Europe
+        case "US", "CA": return .bossGeneral                // Americas
+        default: return .bossBaron                          // World Tour
+        }
+    }
+    /// City where the villain waits.
+    static let villainCity = 5
+
     /// City for an Infection Level (1-based).
     func city(_ level: Int) -> String { cities[max(0, min(cities.count - 1, level - 1))] }
 }

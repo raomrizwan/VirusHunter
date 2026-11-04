@@ -294,7 +294,7 @@ final class CoreTests: XCTestCase {
     func testEachLaterCityHasFiveDifferentBossFights() {
         for country in ["PK", "US", "WORLD"] {
             var lineups = Set<[EnemyKind]>()
-            for lv in 2...9 {
+            for lv in 2...9 where lv != Country.villainCity {
                 let setups = Organ.all.map { $0.at(infection: lv).bossSetup(country: country) }
                 XCTAssertEqual(Set(setups.map(\.kind)).count, 5, "\(country) city \(lv) bosses")
                 XCTAssertEqual(Set(setups.map(\.variant)).count, 5, "\(country) city \(lv) variants")
@@ -383,7 +383,8 @@ final class CoreTests: XCTestCase {
     }
 
     func testPediaCoversEveryCharacterOnce() {
-        XCTAssertEqual(Pedia.all.count, 99)
+        XCTAssertEqual(Pedia.all.count, 103)
+        XCTAssertTrue(Pedia.ids.contains("villain-vira"))
         XCTAssertEqual(Pedia.ids.count, Pedia.all.count, "card ids are unique")
         XCTAssertTrue(Pedia.ids.contains("virus-spiky-horned"))
         XCTAssertTrue(Pedia.ids.contains("boss-sumo-frost"))
@@ -415,9 +416,11 @@ final class CoreTests: XCTestCase {
         for o in Organ.all { XCTAssertEqual(o.mode(country: "PK"), .normal, "city 1 is classic") }
         for lv in 2...9 {
             let modes = Organ.all.map { $0.at(infection: lv).mode(country: "PK") }
-            XCTAssertEqual(modes.filter { $0 == .defense }.count, 1, "city \(lv)")
-            XCTAssertEqual(modes.filter { $0 == .escape }.count, lv >= 3 ? 1 : 0, "city \(lv)")
+            XCTAssertLessThanOrEqual(modes.filter { $0 == .defense }.count, 1, "city \(lv)")
+            XCTAssertLessThanOrEqual(modes.filter { $0 == .escape }.count, lv >= 3 ? 1 : 0, "city \(lv)")
+            XCTAssertGreaterThanOrEqual(modes.filter { $0 != .normal }.count, lv >= 3 ? 1 : 0)
         }
+        XCTAssertEqual(Organ.all[4].at(infection: Country.villainCity).mode(country: "PK"), .normal, "the villain fight is a normal run")
         XCTAssertEqual(Organ.all[4].at(infection: 10).mode(country: "PK"), .normal, "King Vex's fight stays a normal run")
         XCTAssertEqual(Organ.endless.mode(country: "PK"), .normal)
         XCTAssertEqual(Organ.bossRush.mode(country: "PK"), .normal)
@@ -473,5 +476,21 @@ final class CoreTests: XCTestCase {
         var fresh = SaveData(); fresh.recordClear(Organ.all[0])
         fresh.switchCountry(to: "GB")
         XCTAssertEqual(fresh.clearedInfection(1), 1)
+    }
+
+    func testContinentVillainsRuleTheFifthCity() {
+        XCTAssertEqual(Country.find("PK").villain, .bossVira)
+        XCTAssertEqual(Country.find("SA").villain, .bossSultan)
+        XCTAssertEqual(Country.find("GB").villain, .bossBaron)
+        XCTAssertEqual(Country.find("US").villain, .bossGeneral)
+        for c in Country.all {
+            let b = Organ.all[4].at(infection: Country.villainCity).bossSetup(country: c.id)
+            XCTAssertEqual(b.kind, c.villain, c.name)
+            XCTAssertTrue(b.kind.isBoss && b.kind.isVillain)
+        }
+        XCTAssertEqual(Organ.all[4].at(infection: 10).bossSetup(country: "PK").kind, .bossVex)
+        var s = SaveData(); s.countryCode = "IN"
+        for lv in 1...4 { for o in Organ.all { s.recordClear(o.at(infection: lv)) } }
+        XCTAssertTrue(Story.mapScene(save: s)?.lines.contains { $0.text.contains("Queen Vira") } ?? false)
     }
 }

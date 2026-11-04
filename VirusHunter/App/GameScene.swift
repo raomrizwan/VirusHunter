@@ -33,6 +33,7 @@ final class Enemy {
     var summoned = false       // Mega boss already called for backup
     var cloaked = false        // Shadow boss is invisible right now
     var targetsBed = false     // Hospital Defense: heads for the patient's bed instead of Nano
+    var armorT: Double = 0     // Baron Bacter's armor: takes 10% damage while > 0
     var aux: SKNode?           // extra visual (sniper aim line)
     /// Resting tint (boss variant, Golden Virus, enraged Vex); hit flashes return to it.
     var baseTint: UIColor = .white
@@ -652,7 +653,7 @@ final class GameScene: SKScene {
                 v = CGVector(dx: (toP.dx - toP.dy * w) * e.speed, dy: (toP.dy + toP.dx * w) * e.speed)
             case .miniQueen, .miniTurret, .miniRhino, .miniMagnet:
                 v = miniAI(e, toP: toP, d: d, dt: dt)
-            case .bossSumo, .bossCowboy, .bossRoyal, .bossBrain, .bossMarrow, .bossVex:
+            case .bossSumo, .bossCowboy, .bossRoyal, .bossBrain, .bossMarrow, .bossVex, .bossVira, .bossSultan, .bossBaron, .bossGeneral:
                 shooter = e
                 v = bossAI(e, toP: toP, d: d, dt: dt)
                 variantAbility(e, dt: dt)
@@ -780,6 +781,8 @@ final class GameScene: SKScene {
                 for _ in 0..<2 { spawn(.blob, at: jitter(e.pos, 80)) }
                 for _ in 0..<4 { spawn(.mini, at: jitter(e.pos, 60)) }
             }
+        case .bossVira, .bossSultan, .bossBaron, .bossGeneral:
+            v = villainAI(e, toP: toP, d: d, dt: dt)
         case .bossVex:
             // King Vex: dashes, rings and summons; at half health he enrages and teleport-stomps.
             if e.phase == 0, e.hp < e.maxHP * 0.5 {
@@ -890,6 +893,71 @@ final class GameScene: SKScene {
                     let a = atan2(toP.dy, toP.dx) + s
                     fire(from: e.pos, dir: CGVector(dx: cos(a), dy: sin(a)), speed: 210, damage: 9)
                 }
+            }
+        default: break
+        }
+        return v
+    }
+
+    /// King Vex's continent lieutenants.
+    private func villainAI(_ e: Enemy, toP: CGVector, d: Double, dt: Double) -> CGVector {
+        var v = CGVector(dx: toP.dx * e.speed, dy: toP.dy * e.speed)
+        e.timerC -= dt
+        switch e.kind {
+        case .bossVira:
+            // Queen Vira: a royal spiral, swarms of minis, and healers on call.
+            if e.timerC <= 0 {
+                e.timerC = 0.2; e.spin += 0.5
+                for k in 0..<3 { let a = e.spin + Double(k) * 2 * .pi / 3; fire(from: e.pos, dir: CGVector(dx: cos(a), dy: sin(a)), speed: 145, damage: 8) }
+            }
+            if e.timerA <= 0 { e.timerA = 6; for _ in 0..<8 { spawn(.mini, at: jitter(e.pos, 70)) } }
+            if e.timerB <= 0 { e.timerB = 10; for _ in 0..<2 { spawn(.healer, at: jitter(e.pos, 120)) }; state.flash("QUEEN VIRA CALLS HER HEALERS!", seconds: 1.5) }
+        case .bossSultan:
+            // Sultan Spore: sandstorms drag Nano in while spore clouds and fan shots fly.
+            if e.timerA <= 0 {
+                e.timerA = 7
+                wind = CGVector(dx: -toP.dx * 130, dy: -toP.dy * 130); windLeft = 2.5
+                state.flash("🌪 SANDSTORM!", seconds: 1.2)
+            }
+            if e.timerB <= 0 { e.timerB = 4; groupPoint = nil; for _ in 0..<6 { spawn(.spore, near: true) } }
+            if e.timerC <= 0 {
+                e.timerC = 1.6
+                for s in [-0.35, -0.17, 0, 0.17, 0.35] { let a = atan2(toP.dy, toP.dx) + s; fire(from: e.pos, dir: CGVector(dx: cos(a), dy: sin(a)), speed: 200, damage: 9) }
+            }
+        case .bossBaron:
+            // Baron Bacter: armors up (90% less damage), then bursts out with a big ring and a dash.
+            if e.armorT > 0 {
+                e.armorT -= dt
+                v = CGVector(dx: v.dx * 0.3, dy: v.dy * 0.3)
+                if e.armorT <= 0 {
+                    e.baseTint = .white; e.baseBlend = 0; restoreTint(e)
+                    ring(from: e.pos, count: 24, speed: 190, damage: 11)
+                    e.dashing = 0.6; e.dashDir = toP
+                }
+            } else if e.timerA <= 0 {
+                e.timerA = 7; e.armorT = 2.4
+                e.baseTint = UIColor(red: 0.75, green: 0.8, blue: 0.9, alpha: 1); e.baseBlend = 0.6; restoreTint(e)
+                state.flash("BARON BACTER ARMORS UP!", seconds: 1.2)
+            }
+            if e.dashing > 0 { e.dashing -= dt; v = CGVector(dx: e.dashDir.dx * 470, dy: e.dashDir.dy * 470) }
+        case .bossGeneral:
+            // General Germ: aimed missile barrages, and he calls in snipers and bombers.
+            if e.timerC <= 0 {
+                e.timerC = 3
+                for w in 0..<5 {
+                    run(.sequence([.wait(forDuration: 0.12 * Double(w)), .run { [weak self, weak e] in
+                        guard let self, let e, e.alive, !self.simPaused else { return }
+                        let dir = norm(sub(self.ppos, e.pos))
+                        let a = atan2(dir.dy, dir.dx) + Double.random(in: -0.12...0.12)
+                        self.fire(from: e.pos, dir: CGVector(dx: cos(a), dy: sin(a)), speed: 280, damage: 10, tint: UIColor(red: 1, green: 0.6, blue: 0.2, alpha: 1))
+                    }]))
+                }
+            }
+            if e.timerB <= 0 {
+                e.timerB = 9
+                for _ in 0..<2 { spawn(.sniper, at: jitter(e.pos, 200)) }
+                for _ in 0..<2 { spawn(.bomber, at: jitter(e.pos, 150)) }
+                state.flash("GENERAL GERM CALLS THE TROOPS!", seconds: 1.5)
             }
         default: break
         }
@@ -1300,7 +1368,8 @@ final class GameScene: SKScene {
     private func damage(_ e: Enemy, _ amount: Double, knock: CGVector, kb: Double, quiet: Bool = false) {
         guard e.alive else { return }
         let crit = Double.random(in: 0..<1) < 0.08
-        let a = amount * (crit ? 2 : 1)
+        var a = amount * (crit ? 2 : 1)
+        if e.armorT > 0 { a *= 0.1 }
         e.hp -= a
         e.flash = 0.07
         e.node.color = .white
@@ -1386,6 +1455,10 @@ final class GameScene: SKScene {
         case .miniTurret: color = UIColor(red: 0.7, green: 0.75, blue: 0.85, alpha: 1)
         case .miniRhino: color = UIColor(red: 0.85, green: 0.6, blue: 0.3, alpha: 1)
         case .miniMagnet: color = UIColor(red: 1, green: 0.3, blue: 0.3, alpha: 1)
+        case .bossVira: color = UIColor(red: 1, green: 0.4, blue: 0.85, alpha: 1)
+        case .bossSultan: color = UIColor(red: 1, green: 0.75, blue: 0.3, alpha: 1)
+        case .bossBaron: color = UIColor(red: 0.5, green: 0.8, blue: 0.4, alpha: 1)
+        case .bossGeneral: color = UIColor(red: 0.7, green: 0.75, blue: 0.3, alpha: 1)
         }
         // Skip sparks when the screen is already busy; a mass of kills would otherwise add hundreds of nodes.
         let busy = fxLayer.children.count > 140
