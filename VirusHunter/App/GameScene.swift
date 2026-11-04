@@ -212,6 +212,13 @@ final class GameScene: SKScene {
     private let rookie: Bool
     private var swarmFeatured = false
     private var labelPool: [SKLabelNode] = []
+    /// Damage numbers on screen and new ones allowed this frame. Each new number re-renders its
+    /// text, so a big swarm hit by many weapons used to drag the frame rate down as levels grew.
+    private var numbersAlive = 0
+    private var numberBudget = 0
+    /// Effect sprites (sparks, rings) on screen, counted here instead of copying fxLayer.children.
+    private var fxAlive = 0
+    private static var ringTextures: [Bool: SKTexture] = [:]
 
     init(size: CGSize, state: RunState, save: SaveData, autoplay: Bool = false, god: Bool = false) {
         self.state = state
@@ -386,6 +393,7 @@ final class GameScene: SKScene {
             time += dt
             step(dt)
         }
+        numberBudget = 3
         render()
         hudTimer -= rawDt
         if hudTimer <= 0 { hudTimer = 0.1; pushHUD() }
@@ -555,7 +563,10 @@ final class GameScene: SKScene {
     }
 
     private func rebuildGrid() {
-        grid.removeAll(keepingCapacity: true)
+        // Reuse the cell arrays instead of reallocating them every step; drop them once the
+        // player has wandered across many cells.
+        if grid.count > 400 { grid.removeAll(keepingCapacity: true) }
+        else { for k in grid.keys { grid[k]?.removeAll(keepingCapacity: true) } }
         for e in enemies where e.alive { grid[key(Double(e.pos.x), Double(e.pos.y)), default: []].append(e) }
     }
 
@@ -1073,14 +1084,9 @@ final class GameScene: SKScene {
             guard o !== e, !o.golden, o.hp < o.maxHP, dist2(o.pos, e.pos) < r * r else { return }
             o.hp = min(o.maxHP, o.hp + o.maxHP * (o.kind.isBoss ? 0.03 : 0.3))
         }
-        guard fxLayer.children.count < 140 else { return }
-        let ring = SKShapeNode(circleOfRadius: CGFloat(r))
-        ring.position = e.pos; ring.lineWidth = 3; ring.blendMode = .add; ring.zPosition = 2
-        ring.strokeColor = UIColor(red: 0.4, green: 1, blue: 0.55, alpha: 0.8)
-        ring.fillColor = UIColor(red: 0.4, green: 1, blue: 0.55, alpha: 0.08)
-        ring.setScale(0.2)
-        fxLayer.addChild(ring)
-        ring.run(.sequence([.group([.scale(to: 1, duration: 0.45), .fadeOut(withDuration: 0.5)]), .removeFromParent()]))
+        let ring = ringSprite(at: e.pos, radius: r, color: UIColor(red: 0.4, green: 1, blue: 0.55, alpha: 0.8), filled: true)
+        ring.zPosition = 2; ring.setScale(0.2)
+        addFX(ring, life: [.group([.scale(to: 1, duration: 0.45), .fadeOut(withDuration: 0.5)])])
     }
 
     // MARK: weapons
@@ -1239,13 +1245,9 @@ final class GameScene: SKScene {
                         self.damage(e, w.damage * dm, knock: .zero, kb: 0, quiet: true)
                     }
                 }
-                let ring = SKShapeNode(circleOfRadius: CGFloat(w.radius))
-                ring.position = ppos; ring.zPosition = 3; ring.lineWidth = 5; ring.blendMode = .add
-                ring.strokeColor = UIColor(red: 0.6, green: 0.9, blue: 1, alpha: 0.9)
-                ring.fillColor = UIColor(red: 0.5, green: 0.85, blue: 1, alpha: 0.12)
-                ring.setScale(0.3)
-                world.addChild(ring)
-                ring.run(.sequence([.group([.scale(to: 1, duration: 0.25), .sequence([.wait(forDuration: 0.1), .fadeOut(withDuration: 0.3)])]), .removeFromParent()]))
+                let ring = ringSprite(at: ppos, radius: w.radius, color: UIColor(red: 0.6, green: 0.9, blue: 1, alpha: 0.9), filled: true)
+                ring.zPosition = 3; ring.setScale(0.3)
+                addFX(ring, essential: true, life: [.group([.scale(to: 1, duration: 0.25), .sequence([.wait(forDuration: 0.1), .fadeOut(withDuration: 0.3)])])])
             }
         }
         // Homing missiles
@@ -1291,10 +1293,12 @@ final class GameScene: SKScene {
                 var targets: [CGPoint] = []
                 each(near: ppos, radius: 420) { e in if targets.count < w.strikes * 3 { targets.append(e.pos) } }
                 for p in targets.shuffled().prefix(w.strikes) {
-                    let mark = SKShapeNode(circleOfRadius: CGFloat(w.radius)); mark.position = p; mark.zPosition = 3
-                    mark.strokeColor = UIColor(red: 0.5, green: 1, blue: 0.8, alpha: 0.8); mark.lineWidth = 3; mark.setScale(0.3)
+                    let mark = ringSprite(at: p, radius: w.radius, color: UIColor(red: 0.5, green: 1, blue: 0.8, alpha: 0.8))
+                    mark.zPosition = 3; mark.setScale(0.3)
+                    fxAlive += 1
                     fxLayer.addChild(mark)
                     mark.run(.sequence([.scale(to: 1, duration: 0.3), .run { [weak self] in
+                        self?.fxAlive -= 1
                         guard let self, !self.simPaused else { return }
                         self.each(near: p, radius: w.radius + 30) { e in
                             if dist2(e.pos, p) < pow(w.radius + e.radius, 2) { self.damage(e, w.damage * dm, knock: norm(sub(e.pos, p)), kb: 140, quiet: true) }
@@ -1332,8 +1336,7 @@ final class GameScene: SKScene {
         }
         let s = SKShapeNode(path: path)
         s.strokeColor = UIColor(red: 0.75, green: 0.95, blue: 1, alpha: 1); s.lineWidth = 4; s.blendMode = .add
-        fxLayer.addChild(s)
-        s.run(.sequence([.fadeOut(withDuration: 0.18), .removeFromParent()]))
+        addFX(s, essential: true, life: [.fadeOut(withDuration: 0.18)])
     }
 
     private func moveBolts(_ dt: Double) {
@@ -1414,11 +1417,9 @@ final class GameScene: SKScene {
         let g = SKSpriteNode(texture: tex("glow-pink")); g.position = p
         g.size = CGSize(width: radius * 2.2, height: radius * 2.2); g.setScale(0.3); g.alpha = 0.95
         g.blendMode = .add
-        fxLayer.addChild(g)
-        g.run(.sequence([.group([.scale(to: 1, duration: 0.22), .fadeOut(withDuration: 0.35)]), .removeFromParent()]))
-        let ring = SKShapeNode(circleOfRadius: CGFloat(radius)); ring.position = p; ring.strokeColor = color; ring.lineWidth = 6; ring.blendMode = .add; ring.setScale(0.4)
-        fxLayer.addChild(ring)
-        ring.run(.sequence([.group([.scale(to: 1, duration: 0.25), .fadeOut(withDuration: 0.3)]), .removeFromParent()]))
+        addFX(g, life: [.group([.scale(to: 1, duration: 0.22), .fadeOut(withDuration: 0.35)])])
+        let ring = ringSprite(at: p, radius: radius, color: color); ring.setScale(0.4)
+        addFX(ring, life: [.group([.scale(to: 1, duration: 0.25), .fadeOut(withDuration: 0.3)])])
     }
 
     // MARK: damage
@@ -1523,25 +1524,26 @@ final class GameScene: SKScene {
         case .bossGeneral: color = UIColor(red: 0.7, green: 0.75, blue: 0.3, alpha: 1)
         }
         // Skip sparks when the screen is already busy; a mass of kills would otherwise add hundreds of nodes.
-        let busy = fxLayer.children.count > 140
+        let busy = fxAlive > 100
         if busy && !kind.isBoss { return }
         let count = kind.isBoss ? 18 : 3
         for _ in 0..<count {
             let g = SKSpriteNode(texture: tex("glow")); g.color = color; g.colorBlendFactor = 1; g.blendMode = .add
             let s = CGFloat.random(in: 10...22) * (kind.isBoss ? 2.5 : 1)
             g.size = CGSize(width: s, height: s); g.position = p
-            fxLayer.addChild(g)
             let a = Double.random(in: 0..<(2 * .pi)); let d = Double.random(in: 20...55) * (kind.isBoss ? 3 : 1)
-            g.run(.sequence([.group([.moveBy(x: cos(a) * d, y: sin(a) * d, duration: 0.35), .fadeOut(withDuration: 0.35), .scale(to: 0.3, duration: 0.35)]), .removeFromParent()]))
+            addFX(g, essential: kind.isBoss, life: [.group([.moveBy(x: cos(a) * d, y: sin(a) * d, duration: 0.35), .fadeOut(withDuration: 0.35), .scale(to: 0.3, duration: 0.35)])])
         }
     }
 
     private func popNumber(_ v: Double, at p: CGPoint, crit: Bool) {
+        guard numberBudget > 0, numbersAlive < 28 else { return }
+        numberBudget -= 1
+        numbersAlive += 1
         let l: SKLabelNode
         if let r = labelPool.popLast() { l = r } else {
             l = SKLabelNode(fontNamed: "AvenirNext-Heavy"); l.zPosition = 20
         }
-        guard fxLayer.children.count < 160 else { labelPool.append(l); return }
         l.removeAllActions(); l.alpha = 1; l.setScale(1)
         l.text = "\(Int(v.rounded()))"
         l.fontSize = crit ? 20 : 14
@@ -1549,7 +1551,43 @@ final class GameScene: SKScene {
         l.position = CGPoint(x: p.x + CGFloat.random(in: -6...6), y: p.y + 14)
         fxLayer.addChild(l)
         l.run(.sequence([.group([.moveBy(x: 0, y: 26, duration: 0.5), .sequence([.wait(forDuration: 0.25), .fadeOut(withDuration: 0.25)])]),
-                         .run { [weak self, weak l] in guard let l else { return }; l.removeFromParent(); self?.labelPool.append(l) }]))
+                         .run { [weak self, weak l] in
+                             guard let self, let l else { return }
+                             l.removeFromParent(); self.labelPool.append(l); self.numbersAlive -= 1
+                         }]))
+    }
+
+    /// A ring effect as a sprite (one cached texture) instead of an SKShapeNode, which costs a
+    /// tessellation and its own draw call every time.
+    private func ringSprite(at p: CGPoint, radius: Double, color: UIColor, filled: Bool = false) -> SKSpriteNode {
+        let tex: SKTexture
+        if let t = GameScene.ringTextures[filled] { tex = t } else {
+            let r: CGFloat = 64, pad: CGFloat = 4
+            let img = UIGraphicsImageRenderer(size: CGSize(width: r * 2 + pad * 2, height: r * 2 + pad * 2)).image { _ in
+                let path = UIBezierPath(ovalIn: CGRect(x: pad, y: pad, width: r * 2, height: r * 2))
+                if filled { UIColor(white: 1, alpha: 0.14).setFill(); path.fill() }
+                UIColor.white.setStroke(); path.lineWidth = 5; path.stroke()
+            }
+            tex = SKTexture(image: img)
+            GameScene.ringTextures[filled] = tex
+        }
+        let s = SKSpriteNode(texture: tex)
+        let d = CGFloat(radius) * 2 * (136 / 128)
+        s.size = CGSize(width: d, height: d)
+        s.position = p
+        s.color = color; s.colorBlendFactor = 1; s.alpha = color.cgColor.alpha
+        s.blendMode = .add
+        return s
+    }
+
+    /// Adds a short-lived effect node, skipping it when the screen already has plenty.
+    @discardableResult
+    private func addFX(_ n: SKNode, essential: Bool = false, life: [SKAction]) -> Bool {
+        guard essential || fxAlive < 120 else { return false }
+        fxAlive += 1
+        fxLayer.addChild(n)
+        n.run(.sequence(life + [.run { [weak self] in self?.fxAlive -= 1 }, .removeFromParent()]))
+        return true
     }
 
     private func hurt(_ amount: Double) {
