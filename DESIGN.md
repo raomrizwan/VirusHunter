@@ -68,6 +68,11 @@ City N plays every organ at Infection Level N (the city strip on the map selects
 Each level above 1: enemy health/damage +40% (of the stage value), speed +3%, spawn rate +7%, elites every 60 s → 30 s min (−3 s/level),
 clear reward +60%, run coins +15%. The map dot shows the highest level cleared. Endless is unaffected.
 
+## Daily (`Core/Daily.swift`)
+Three missions a day (seeded by date: one easy, one medium, one hard, different kinds), 250-700 coins each,
+plus a 500-coin chest for all three. Login streak pays 100/150/200/300/400/500/1000 for days 1-7 (missing a day resets).
+Home has a "Daily" button with a badge for unclaimed rewards.
+
 ## Meta — Tech Lab (Bio-Coins)
 Permanent upgrades: Power, Armor (−dmg), Max HP, Speed, Magnet, Coin bonus, Revive (one free).
 Each 10 levels, rising cost. After MAX, **Mutation Ranks** (up to 50 per tech, not Revive): each rank is worth 0.4 of a level

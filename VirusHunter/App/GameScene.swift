@@ -115,6 +115,7 @@ final class GameScene: SKScene {
     private var nextElite: Double = 60
     private var nextBoss: Double
     private var bossCount = 0
+    private var bossKills = 0
     private weak var boss: Enemy?
     private var bossDefeated = false
     private var simPaused = false
@@ -753,6 +754,7 @@ final class GameScene: SKScene {
         // drops
         let xpValue = e.xp
         if e.kind.isBoss {
+            bossKills += 1
             for _ in 0..<14 { drop(.coin(3), at: jitter(e.pos, 70)) }
             drop(.chest, at: e.pos)
             for _ in 0..<10 { drop(.xp(5), at: jitter(e.pos, 80)) }
@@ -1007,7 +1009,7 @@ final class GameScene: SKScene {
         }
     }
 
-    var result: (coins: Int, kills: Int, time: Double, level: Int) { (coinsCollected, kills, time, level) }
+    var result: (coins: Int, kills: Int, time: Double, level: Int, bosses: Int) { (coinsCollected, kills, time, level, bossKills) }
 
     // MARK: render & HUD
 

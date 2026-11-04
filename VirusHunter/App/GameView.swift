@@ -92,6 +92,9 @@ struct GameContent: View {
         if won { s.recordClear(organ) }
         let scene = won ? Story.afterWin(organ, before: model.save, after: s) : nil
         if organ.isEndless { s.bestEndless = max(s.bestEndless, r.time) }
+        s.daily.refresh()
+        s.daily.record(RunReport(kills: r.kills, bosses: r.bosses, cleared: won && !organ.isEndless, seconds: r.time,
+                                 coins: r.coins, level: r.level, endless: organ.isEndless))
         model.save = s
         model.persist()
         unlocks = newUnlocks(before: before, after: s)
@@ -113,6 +116,9 @@ struct GameContent: View {
             if after.citiesCleared < Organ.maxInfection { out.append("Outbreak in \(after.country.city(after.currentCity)) unlocked") }
         }
         for k in Skin.allCases where after.owns(k) && !before.owns(k) { out.append("\(k.title) unlocked") }
+        for m in after.daily.missions where m.done && !(before.daily.missions.first { $0.id == m.id }?.done ?? false) {
+            out.append("Daily mission done: \(m.title)")
+        }
         return out
     }
 
@@ -387,7 +393,7 @@ struct ResultView: View {
                     }
                 }
                 ForEach(unlocks, id: \.self) { u in
-                    Label(u, systemImage: u.contains("cured") ? "cross.case.fill" : "lock.open.fill").font(Theme.body(16, .heavy)).foregroundStyle(Theme.lime)
+                    Label(u, systemImage: u.contains("cured") ? "cross.case.fill" : u.hasPrefix("Daily") ? "star.fill" : "lock.open.fill").font(Theme.body(16, .heavy)).foregroundStyle(Theme.lime)
                 }
                 if let r = reward, let g = save.nextGoal {
                     GoalCard(goal: g, coins: save.coins, earned: r.coins)

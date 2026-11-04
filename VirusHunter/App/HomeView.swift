@@ -14,6 +14,19 @@ struct HomeView: View {
             VStack(spacing: 0) {
                 HStack {
                     CoinBadge(coins: model.save.coins)
+                    Button { model.go(.daily) } label: {
+                        Label("Daily", systemImage: "star.circle.fill").font(Theme.body(15, .heavy)).foregroundStyle(Theme.gold)
+                            .padding(.horizontal, 12).frame(height: 42).glass(14)
+                            .overlay(alignment: .topTrailing) {
+                                let n = model.save.daily.unclaimed
+                                if n > 0 {
+                                    Text("\(n)").font(Theme.body(11, .black)).foregroundStyle(.white)
+                                        .frame(width: 20, height: 20).background(Circle().fill(Theme.magenta)).offset(x: 6, y: -6)
+                                }
+                            }
+                    }
+                    .buttonStyle(PressStyle())
+                    .accessibilityIdentifier("dailyButton")
                     Spacer()
                     toggle(sound ? "speaker.wave.2.fill" : "speaker.slash.fill") { sound.toggle() }.accessibilityIdentifier("soundToggle")
                     toggle(haptics ? "iphone.radiowaves.left.and.right" : "iphone.slash") { haptics.toggle() }

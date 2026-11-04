@@ -190,4 +190,43 @@ final class CoreTests: XCTestCase {
         XCTAssertNil(r.nextCost(.revive))
         XCTAssertFalse(r.buy(.revive))
     }
+
+    func testDailyMissionsAreStableAndDistinct() {
+        let a = DailyState.missions(for: "2026-11-04"), b = DailyState.missions(for: "2026-11-04")
+        XCTAssertEqual(a, b)
+        XCTAssertEqual(a.count, 3)
+        XCTAssertEqual(Set(a.map(\.kind)).count, 3)
+    }
+
+    func testDailyRecordAndClaim() {
+        var s = SaveData()
+        s.daily.missions = [Mission(id: 0, kind: .kills, target: 100, reward: 250),
+                            Mission(id: 1, kind: .survive, target: 180, reward: 400),
+                            Mission(id: 2, kind: .endless, target: 120, reward: 300)]
+        s.daily.record(RunReport(kills: 60, seconds: 200, endless: false))
+        XCTAssertEqual(s.daily.missions[0].progress, 60)
+        XCTAssertTrue(s.daily.missions[1].done)
+        XCTAssertEqual(s.daily.missions[2].progress, 0) // only Endless runs count
+        XCTAssertNil(s.claimMission(0))
+        XCTAssertEqual(s.claimMission(1), 400)
+        XCTAssertNil(s.claimMission(1))
+        s.daily.record(RunReport(kills: 60, seconds: 130, endless: true))
+        XCTAssertTrue(s.daily.allDone)
+        XCTAssertEqual(s.claimDailyBonus(), DailyState.bonusReward)
+    }
+
+    func testLoginStreak() {
+        var cal = Calendar(identifier: .gregorian); cal.timeZone = TimeZone(identifier: "UTC")!
+        let d1 = Date(timeIntervalSince1970: 1_800_000_000)
+        var d = DailyState()
+        d.refresh(now: d1, calendar: cal)
+        XCTAssertEqual(d.streak, 1)
+        XCTAssertTrue(d.canClaimStreak)
+        d.streakClaimedDay = d.lastLoginDay
+        d.refresh(now: d1.addingTimeInterval(86_400), calendar: cal)
+        XCTAssertEqual(d.streak, 2)
+        XCTAssertTrue(d.canClaimStreak)
+        d.refresh(now: d1.addingTimeInterval(86_400 * 4), calendar: cal)
+        XCTAssertEqual(d.streak, 1) // missed days reset the streak
+    }
 }

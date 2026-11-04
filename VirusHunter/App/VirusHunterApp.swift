@@ -13,7 +13,7 @@ struct VirusHunterApp: App {
 /// App-wide state: saved progress and which screen is showing.
 @MainActor
 final class AppModel: ObservableObject {
-    enum Screen: Equatable { case home, map, lab, skins, game(Organ) }
+    enum Screen: Equatable { case home, map, lab, skins, daily, game(Organ) }
 
     @Published var save: SaveData
     @Published var screen: Screen
@@ -38,6 +38,7 @@ final class AppModel: ObservableObject {
         if let i = AppModel.args.firstIndex(of: "-startStage"), i + 1 < AppModel.args.count, let n = Int(AppModel.args[i + 1]) {
             first = .game(n == 0 ? .endless : Organ.all[max(0, min(4, n - 1))])
         }
+        s.daily.refresh()
         save = s
         screen = first
         if fresh { persist() } // the run reads the save from disk
@@ -45,6 +46,13 @@ final class AppModel: ObservableObject {
     }
 
     func persist() { SaveStore.shared.save(save) }
+
+    /// New day while the app stayed open or in the background: roll the missions and streak over.
+    func refreshDaily() {
+        var d = save.daily
+        d.refresh()
+        if d != save.daily { save.daily = d; persist() }
+    }
 
     func go(_ s: Screen) { withAnimation(.easeInOut(duration: 0.3)) { screen = s } }
 
@@ -106,6 +114,7 @@ struct RootView: View {
             case .map: MapView().transition(.move(edge: .trailing))
             case .lab: LabView().transition(.move(edge: .trailing))
             case .skins: SkinsView().transition(.move(edge: .trailing))
+            case .daily: DailyView().transition(.move(edge: .trailing))
             case .game(let organ): GameView(organ: organ).transition(.opacity).id("\(organ.id)-\(organ.infection)")
             }
             if model.needsCountry || model.pickingCountry {
@@ -115,6 +124,7 @@ struct RootView: View {
                 StoryView(story: st) { model.closeStory() }.id(st.id).transition(.opacity).zIndex(10)
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in model.refreshDaily() }
         .onAppear {
             Sound.preload()
             if !AppModel.uiTesting { AdService.start() }
