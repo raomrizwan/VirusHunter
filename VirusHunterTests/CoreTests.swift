@@ -330,4 +330,55 @@ final class CoreTests: XCTestCase {
         let p = PlayerStats.make(save: SaveData(), loadout: Loadout())
         for kind in EnemyKind.specials { XCTAssertGreaterThan(p.speed, kind.base.speed * 1.12 * 1.75, "\(kind)") }
     }
+
+    func testCityStrainsMiniBossesAndBackdrops() {
+        XCTAssertNil(VirusStrain.forCity(1, country: "PK"))
+        let strains = (2...10).compactMap { VirusStrain.forCity($0, country: "PK") }
+        XCTAssertEqual(Set(strains).count, 9, "every city after the first has its own strain")
+        XCTAssertEqual(VirusStrain.forCity(3, country: "PK"), VirusStrain.forCity(3, country: "PK"))
+        XCTAssertEqual(EnemyKind.spiky.texture(strain: .horned), "virus-spiky-horned")
+        XCTAssertEqual(EnemyKind.bomber.texture(strain: .horned), "virus-bomber")
+        XCTAssertEqual(EnemyKind.spiky.texture(strain: nil), "virus-spiky")
+        XCTAssertNil(Organ.endless.strain(country: "PK"))
+        for o in Organ.all {
+            for lv in 1...10 {
+                let m = o.at(infection: lv).miniBoss(country: "PK")
+                XCTAssertTrue(m.isMiniBoss)
+                XCTAssertFalse(m.isBoss)
+                XCTAssertFalse(m.miniTitle.isEmpty)
+            }
+        }
+        let seen = Set(Organ.all.flatMap { o in (1...10).map { o.at(infection: $0).miniBoss(country: "PK") } })
+        XCTAssertEqual(seen.count, 4, "all four mini bosses show up somewhere")
+        XCTAssertEqual(Organ.all[0].backdrop, "bg-lungs")
+        XCTAssertEqual(Organ.all[0].at(infection: 2).backdrop, "bg-lungs-2")
+        XCTAssertEqual(Organ.endless.backdrop, "bg-endless")
+    }
+
+    func testVaccineReportAfterEveryOrganClear() {
+        // City 2, second organ cleared: Dr. Leuko reports vaccine progress.
+        var before = SaveData(); before.countryCode = "PK"; before.unlockedStage = 5
+        for o in Organ.all { before.recordClear(o) }
+        before.recordClear(Organ.all[0].at(infection: 2))
+        var after = before; after.recordClear(Organ.all[1].at(infection: 2))
+        let s = Story.afterWin(Organ.all[1].at(infection: 2), before: before, after: after)
+        XCTAssertEqual(s?.id, "vaccine-2-2")
+        XCTAssertTrue(s?.title.contains("2/5") ?? false)
+        XCTAssertTrue(s?.lines.contains { $0.text.contains("Lahore") && $0.text.contains("Vaccine 2 of 5") } ?? false)
+        // Replaying an organ already cleared at that level says nothing.
+        XCTAssertNil(Story.afterWin(Organ.all[1].at(infection: 2), before: after, after: after))
+        // Last organ of the city: the vaccine is ready and the city is saved.
+        var b2 = after
+        for o in Organ.all[2...3] { b2.recordClear(o.at(infection: 2)) }
+        var a2 = b2; a2.recordClear(Organ.all[4].at(infection: 2))
+        let saved = Story.afterWin(Organ.all[4].at(infection: 2), before: b2, after: a2)
+        XCTAssertEqual(saved?.title, "Lahore Saved!")
+        XCTAssertTrue(saved?.lines.contains { $0.text.contains("vaccine is ready") } ?? false)
+        // First city: the chapter outro also carries the vaccine progress.
+        var f0 = SaveData(); f0.countryCode = "PK"
+        var f1 = f0; f1.recordClear(Organ.all[0])
+        let first = Story.afterWin(Organ.all[0], before: f0, after: f1)
+        XCTAssertEqual(first?.id, "outro-1")
+        XCTAssertTrue(first?.lines.contains { $0.text.contains("Vaccine 1 of 5") } ?? false)
+    }
 }

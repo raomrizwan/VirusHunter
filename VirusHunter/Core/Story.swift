@@ -188,8 +188,13 @@ enum Story {
         // Reveal this city's mutation only now, as a surprise.
         let m = CityMutation.forCity(c, country: save.country.id)
         let warning = StoryLine(speaker: .leuko, text: "Careful, Nano. Scans show a \(m.title) here: \(m.detail)")
+        var extra = [warning]
+        if let strain = VirusStrain.forCity(c, country: save.country.id) {
+            extra.append(StoryLine(speaker: .nano, text: "The viruses here look different. Is that a new army?"))
+            extra.append(StoryLine(speaker: .vex, text: "Meet my \(strain.title)! Bred just for this city."))
+        }
         let r = resolve(s, country: save.country, city: c)
-        return StoryScene(id: r.id, title: r.title, lines: r.lines + [warning])
+        return StoryScene(id: r.id, title: r.title, lines: r.lines + extra)
     }
 
     /// Shown after a won run: a saved city (first city / whole country), else the organ's first-clear outro.
@@ -204,13 +209,64 @@ enum Story {
                 return resolve(s, country: country, city: 1)
             }
         }
+        let newlyCleared = before.clearedInfection(organ.id) < organ.infection && after.clearedInfection(organ.id) >= organ.infection
         let id = "outro-\(organ.id)"
-        guard organ.infection == 1, !before.clearedStages.contains(organ.id), !after.seenStory.contains(id), var s = scene(id) else { return nil }
-        // A brand-new player skips the Lungs intro (they start straight in a run), so meet Dr. Leuko here.
-        if organ.id == 1, !after.seenStory.contains("intro-1"), let intro = scene("intro-1") {
-            s = StoryScene(id: s.id, title: s.title, lines: Array(intro.lines.prefix(2)) + s.lines)
+        if organ.infection == 1, !before.clearedStages.contains(organ.id), !after.seenStory.contains(id), var s = scene(id) {
+            // A brand-new player skips the Lungs intro (they start straight in a run), so meet Dr. Leuko here.
+            if organ.id == 1, !after.seenStory.contains("intro-1"), let intro = scene("intro-1") {
+                s = StoryScene(id: s.id, title: s.title, lines: Array(intro.lines.prefix(2)) + s.lines)
+            }
+            s = StoryScene(id: s.id, title: s.title, lines: s.lines + [vaccineLine(organ.infection, after: after)])
+            return resolve(s, country: country, city: 1)
         }
-        return resolve(s, country: country, city: 1)
+        guard newlyCleared else { return nil }
+        return vaccineUpdate(organ, after: after)
+    }
+
+    /// Dr. Leuko's report after an organ is cleared: what it adds to the vaccine and how close the city is.
+    static func vaccineUpdate(_ organ: Organ, after: SaveData) -> StoryScene {
+        let level = organ.infection, n = Organ.all.count
+        let done = after.organsCleared(inCity: level)
+        var lines = [L(.leuko, organLine(organ.id, level))]
+        let title: String
+        if done >= n {
+            title = "{city} Saved!"
+            lines += [
+                L(.leuko, "The vaccine is ready! Trucks are taking it to every hospital in {city}."),
+                L(.nano, "Beep! Vaccine delivered."),
+                L(.vex, level >= Organ.maxInfection - 1 ? "No... my last hideout is all I have left!" : "Enjoy it while it lasts. My next strain is already waking up in {next}."),
+            ]
+        } else {
+            title = "Vaccine \(done)/\(n) · {city}"
+            lines.append(vaccineLine(level, after: after))
+        }
+        return resolve(StoryScene(id: "vaccine-\(level)-\(organ.id)", title: title, lines: lines), country: after.country, city: level)
+    }
+
+    /// "Vaccine 2 of 5 ready" plus how many people in the city are getting better.
+    static func vaccineLine(_ level: Int, after: SaveData) -> StoryLine {
+        let n = Organ.all.count, done = after.organsCleared(inCity: level)
+        let cured = Country.outbreakSize(level) - after.infected(inCity: level)
+        if done >= n { return L(.leuko, "All five parts are done. The vaccine is ready for {city}!") }
+        let left = n - done
+        return L(.leuko, "Vaccine \(done) of \(n) ready! \(cured.formatted()) people in {city} are already getting better. \(left) more organ\(left == 1 ? "" : "s") to go.")
+    }
+
+    private static func organLine(_ id: Int, _ level: Int) -> String {
+        let lines: [Int: [String]] = [
+            1: ["Lung samples secured! Their antibodies are the first piece of the vaccine.",
+                "The lungs are breathing clean air again. I'm adding their antibodies to the vaccine."],
+            2: ["The heart's blood is clean. I can grow the vaccine in it now.",
+                "Heartbeat steady! Clean blood cells are going straight into the vaccine lab."],
+            3: ["Stomach acid is back to normal. Now the vaccine can work as a simple pill.",
+                "The stomach is clear! Its healthy bacteria will make the vaccine stronger."],
+            4: ["The brain is clear, and Patient Zero remembers where they caught the virus. A big clue for the vaccine!",
+                "Brain signals are back to normal. I'm mapping how the virus fooled the body, so the vaccine can't be fooled."],
+            5: ["Bone marrow is making healthy cells again. That's the strongest part of the vaccine.",
+                "The marrow is ours! Fresh white blood cells are joining the vaccine."],
+        ]
+        let options = lines[id] ?? ["Organ cleared!"]
+        return options[level % options.count]
     }
 
     /// Country health on the map, 0...1: every organ cleared in every city counts the same.

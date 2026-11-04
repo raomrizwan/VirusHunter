@@ -208,6 +208,7 @@ func xpToNext(_ level: Int) -> Int { 4 + 3 * level + Int(pow(Double(level), 1.5)
 enum EnemyKind: String, CaseIterable {
     case spiky, mini, blob, dart, spitter, elite
     case bomber, healer, sniper, spore
+    case miniQueen, miniTurret, miniRhino, miniMagnet
     case bossSumo, bossCowboy, bossRoyal, bossBrain, bossMarrow, bossVex
 
     struct Stats { let hp: Double; let speed: Double; let radius: Double; let damage: Double; let xp: Int }
@@ -224,6 +225,10 @@ enum EnemyKind: String, CaseIterable {
         case .healer: return Stats(hp: 30, speed: 48, radius: 17, damage: 8, xp: 3)
         case .sniper: return Stats(hp: 20, speed: 50, radius: 15, damage: 8, xp: 3)
         case .spore: return Stats(hp: 8, speed: 72, radius: 11, damage: 6, xp: 1)
+        case .miniQueen: return Stats(hp: 650, speed: 40, radius: 34, damage: 18, xp: 25)
+        case .miniTurret: return Stats(hp: 700, speed: 22, radius: 32, damage: 16, xp: 25)
+        case .miniRhino: return Stats(hp: 600, speed: 50, radius: 32, damage: 22, xp: 25)
+        case .miniMagnet: return Stats(hp: 600, speed: 45, radius: 32, damage: 18, xp: 25)
         case .bossSumo: return Stats(hp: 2000, speed: 46, radius: 62, damage: 26, xp: 60)
         case .bossCowboy: return Stats(hp: 1800, speed: 58, radius: 56, damage: 22, xp: 60)
         case .bossRoyal: return Stats(hp: 2300, speed: 42, radius: 60, damage: 24, xp: 60)
@@ -241,11 +246,27 @@ enum EnemyKind: String, CaseIterable {
         case .bossBrain: return "boss-brain"
         case .bossMarrow: return "boss-marrow"
         case .bossVex: return "king-vex"
+        case .miniQueen: return "miniboss-queen"
+        case .miniTurret: return "miniboss-turret"
+        case .miniRhino: return "miniboss-rhino"
+        case .miniMagnet: return "miniboss-magnet"
         default: return "virus-\(rawValue)"
         }
     }
     /// Sprite size relative to the hit radius (art includes spikes and glow).
-    var spriteScale: Double { isBoss ? 2.6 : self == .blob ? 2.3 : 2.9 }
+    var spriteScale: Double { isBoss || isMiniBoss ? 2.6 : self == .blob ? 2.3 : 2.9 }
+    var isMiniBoss: Bool { EnemyKind.miniBosses.contains(self) }
+    static let miniBosses: [EnemyKind] = [.miniQueen, .miniTurret, .miniRhino, .miniMagnet]
+    /// Mini boss name shown when it arrives.
+    var miniTitle: String {
+        switch self {
+        case .miniQueen: return "Brood Queen"
+        case .miniTurret: return "Turret Tick"
+        case .miniRhino: return "Rhino Charger"
+        case .miniMagnet: return "Magnet Mite"
+        default: return ""
+        }
+    }
     var bossTitle: String {
         switch self {
         case .bossSumo: return "Sumo Virus"

@@ -82,6 +82,12 @@ an arrival scene per city 2-10 on the map, a finale after city 10, Endless intro
 - Four special viruses: **Bomber** (stops next to Nano, 0.8 s fuse, blast also hurts viruses), **Healer** (keeps away, heals nearby viruses 30% every 3 s), **Sniper** (holds 300-380 away, red aim line, then a fast shot), **Spore** (weaving clusters).
 - Each organ has a signature special (Lungs Spore, Heart Bomber, Stomach Healer, Brain Sniper, Bone Marrow two random); city 2+ adds a guest special and city 6+ another, picked per country. Endless uses all four.
 
+### City strains, mini bosses, backgrounds, vaccine reports
+- **Strains:** from city 2 the six regular viruses wear a city look (Horned, Crystal, Armored, Punk, Cyclops, Zombie, Gold, Ninja, Pirate; `virus-<kind>-<strain>`), shuffled per country. The arena tiles take the strain's color and Dr. Leuko/King Vex mention it on arrival.
+- **Mini bosses** at 125 s (every 150 s in Endless), one per organ+city: Brood Queen (lays minis, bursts into spikies), Turret Tick (four rotating streams), Rhino Charger (three charges in a row), Magnet Mite (pulls Nano in, fires spreads). Chest + 16 coins.
+- **Backgrounds:** each organ has its own motif (alveoli, blood cells, villi, neurons, bone lattice) and a second infected palette used on even cities (`bg-<organ>-2`), plus drifting parallax cells.
+- **Vaccine report:** after every new organ clear Dr. Leuko says what it added to the vaccine and how many people are recovering ("Vaccine 2 of 5"); the fifth clear announces the vaccine and the saved city.
+
 ### City rewards (kept secret until earned)
 City 1: 1,250 coins · 2: **Freeze Ray** weapon (frost wave, slows; evolves with DNA Magnet into Absolute Zero) · 3: **Frost Nano** skin ·
 4: **Homing Missiles** weapon (steer + explode; evolves with Overcharge into Rocket Storm) · 5: **Plasma Nano** skin ·

@@ -344,6 +344,137 @@ def boss_variant(kind, variant, size=512):
     return f'{head}<defs>{d}{defs}</defs>{"".join(back)}{body}{"".join(front)}</svg>'
 
 
+# ---------------------------------------------------------------- city strains (regular viruses, city 2+)
+STRAIN_PAL = {
+    "horned": ("#FF9A8A", "#E0343A", "#6A0A10"),
+    "crystal": ("#E6FFFF", "#5FE3F0", "#0E6A80"),
+    "armored": ("#E4E8F0", "#9AA4B8", "#3A4256"),
+    "punk": ("#FFB0F0", "#F03CC8", "#6A0A5A"),
+    "cyclops": ("#FFE0A0", "#FFA024", "#7A3A00"),
+    "zombie": ("#D8E8C0", "#8FA878", "#3A4A2A"),
+    "gold": ("#FFF6B0", "#F2C230", "#7A5A00"),
+    "ninja": ("#8A8AA0", "#3A3A4E", "#101018"),
+    "pirate": ("#B0FFE8", "#20C8A0", "#0A5A48"),
+}
+STRAINS = list(STRAIN_PAL)
+STRAIN_KINDS = ["spiky", "blob", "dart", "spitter", "mini", "elite"]
+KIND_PAL = {"spiky": ("#B7FF5C", "#4CC21E", "#1F6B10"), "blob": ("#E3A0FF", "#A24BEB", "#4E1883"),
+            "dart": ("#FFD08A", "#FF8A1F", "#9A3E00"), "spitter": ("#FFF27A", "#E8C619", "#7A6400"),
+            "mini": ("#FF9AAE", "#FF3D6A", "#8A0F2E"), "elite": ("#8AF2FF", "#14B8E6", "#0A4F7A")}
+
+
+def recolor(svg, old, new):
+    for o, n in zip(old, new):
+        svg = svg.replace(o, n)
+    return svg
+
+
+def add_layers(svg, back=(), front=(), defs=""):
+    head, rest = svg.split("<defs>", 1)
+    d, body = rest.split("</defs>", 1)
+    body = body.replace("</svg>", "")
+    return f'{head}<defs>{d}{defs}</defs>{"".join(back)}{body}{"".join(front)}</svg>'
+
+
+def strain_virus(kind, strain, size=256):
+    """A regular virus in a city strain: new colors plus a look of its own (horns, crystals, helmet...)."""
+    svg = recolor(virus(kind, size, seed=hash(kind) % 100), KIND_PAL[kind], STRAIN_PAL[strain])
+    light, mid, dark = STRAIN_PAL[strain]
+    c = size / 2
+    r = size * (0.30 if kind != "blob" else 0.34)
+    ey, ex, er = c - r * 0.08, r * 0.36, r * 0.2
+    w = size * 0.014
+    back, front = [], []
+    if strain == "horned":
+        for sx in (-1, 1):
+            front.append(f'<path d="M{c+sx*r*0.35} {c-r*0.8} Q{c+sx*r*0.75} {c-r*1.25} {c+sx*r*0.55} {c-r*1.55} Q{c+sx*r*0.95} {c-r*1.2} {c+sx*r*0.7} {c-r*0.65} Z" fill="#2A0A10" stroke="#FFD0C0" stroke-width="{w}"/>')
+    elif strain == "crystal":
+        for a in (-2.1, -1.57, -1.04, 2.4, 0.75):
+            x, y = c + math.cos(a) * r * 1.3, c + math.sin(a) * r * 1.3
+            bx, by = c + math.cos(a) * r * 0.7, c + math.sin(a) * r * 0.7
+            nx, ny = -math.sin(a) * r * 0.16, math.cos(a) * r * 0.16
+            front.append(f'<path d="M{bx+nx} {by+ny} L{x} {y} L{bx-nx} {by-ny} Z" fill="#F0FFFF" stroke="#0E6A80" stroke-width="{w}" opacity=".95"/>')
+    elif strain == "armored":
+        front.append(f'<path d="M{c-r*0.95} {ey-er*0.9} Q{c} {c-r*1.45} {c+r*0.95} {ey-er*0.9} L{c+r*0.85} {ey-er*1.6} Q{c} {c-r*1.2} {c-r*0.85} {ey-er*1.6} Z" fill="#C8D0DE" stroke="#3A4256" stroke-width="{w}"/>')
+        front.append(f'<path d="M{c} {c-r*1.28} V{ey-er*1.9}" stroke="#3A4256" stroke-width="{w*1.5}"/>')
+        for sx in (-1, 1):
+            front.append(f'<circle cx="{c+sx*r*0.6}" cy="{ey-er*1.45}" r="{r*0.06}" fill="#3A4256"/>')
+    elif strain == "punk":
+        for i in range(5):
+            x = c - r * 0.4 + i * r * 0.2
+            h = r * (0.55 + 0.15 * (2 - abs(i - 2)))
+            front.append(f'<path d="M{x-r*0.1} {c-r*0.9} L{x} {c-r*0.9-h} L{x+r*0.1} {c-r*0.9} Z" fill="#7CFF3A" stroke="#1F5A0A" stroke-width="{w}"/>')
+    elif strain == "cyclops":
+        front.append(f'<ellipse cx="{c}" cy="{ey}" rx="{r*0.75}" ry="{er*1.6}" fill="{mid}"/>')
+        front.append(f'<circle cx="{c}" cy="{ey}" r="{er*1.45}" fill="#fff" stroke="{dark}" stroke-width="{w}"/><circle cx="{c+er*0.2}" cy="{ey+er*0.2}" r="{er*0.8}" fill="#1A1020"/><circle cx="{c-er*0.15}" cy="{ey-er*0.25}" r="{er*0.28}" fill="#fff"/>')
+        front.append(f'<path d="M{c-er*1.7} {ey-er*1.9} L{c+er*1.7} {ey-er*1.5}" stroke="{dark}" stroke-width="{r*0.13}" stroke-linecap="round"/>')
+    elif strain == "zombie":
+        front.append(f'<path d="M{c-r*0.7} {c+r*0.1} L{c-r*0.1} {c-r*0.5}" stroke="#3A4A2A" stroke-width="{w}" fill="none"/>')
+        for k in range(4):
+            t = k / 3
+            x, y = c - r * 0.7 + t * r * 0.6, c + r * 0.1 - t * r * 0.6
+            front.append(f'<path d="M{x-r*0.08} {y-r*0.08} L{x+r*0.08} {y+r*0.08}" stroke="#3A4A2A" stroke-width="{w}"/>')
+        front.append(f'<rect x="{c+r*0.25}" y="{c+r*0.05}" width="{r*0.4}" height="{r*0.18}" rx="{r*0.04}" fill="#F2E6C8" stroke="#3A4A2A" stroke-width="{w*0.7}" transform="rotate(-20 {c+r*0.45} {c+r*0.14})"/>')
+    elif strain == "gold":
+        front.append(f'<path d="M{c-r*0.45} {c-r*0.85} L{c-r*0.5} {c-r*1.3} L{c-r*0.22} {c-r*1.05} L{c} {c-r*1.4} L{c+r*0.22} {c-r*1.05} L{c+r*0.5} {c-r*1.3} L{c+r*0.45} {c-r*0.85} Z" fill="#FFE45C" stroke="#7A5A00" stroke-width="{w}"/>')
+        front.append(f'<circle cx="{c}" cy="{c-r*1.12}" r="{r*0.08}" fill="#FF3D6A"/>')
+    elif strain == "ninja":
+        front.append(f'<rect x="{c-r*1.0}" y="{ey-er*1.15}" width="{r*2.0}" height="{er*2.3}" rx="{er*0.6}" fill="#C8202A" opacity=".92"/>')
+        front.append(f'<ellipse cx="{c-ex}" cy="{ey}" rx="{er*0.9}" ry="{er*0.7}" fill="#fff"/><ellipse cx="{c+ex}" cy="{ey}" rx="{er*0.9}" ry="{er*0.7}" fill="#fff"/>')
+        front.append(f'<circle cx="{c-ex+er*0.2}" cy="{ey+er*0.1}" r="{er*0.45}" fill="#1A1020"/><circle cx="{c+ex-er*0.2}" cy="{ey+er*0.1}" r="{er*0.45}" fill="#1A1020"/>')
+        front.append(f'<path d="M{c+r*0.95} {ey} Q{c+r*1.3} {ey-er} {c+r*1.45} {ey+er*0.5} M{c+r*0.95} {ey+er*0.5} Q{c+r*1.3} {ey+er*1.5} {c+r*1.4} {ey+er*2.2}" stroke="#C8202A" stroke-width="{w*2}" fill="none" stroke-linecap="round"/>')
+    elif strain == "pirate":
+        front.append(f'<path d="M{c-r*0.95} {c-r*0.55} Q{c} {c-r*1.35} {c+r*0.95} {c-r*0.55} Q{c} {c-r*0.85} {c-r*0.95} {c-r*0.55} Z" fill="#E0303A" stroke="#5E0A12" stroke-width="{w}"/>')
+        for k in range(4):
+            front.append(f'<circle cx="{c-r*0.45+k*r*0.3}" cy="{c-r*0.85}" r="{r*0.05}" fill="#fff"/>')
+        front.append(f'<circle cx="{c+ex}" cy="{ey+er*0.1}" r="{er*1.15}" fill="#14141C"/><path d="M{c+ex-er} {ey-er*0.6} L{c-r*0.2} {c-r*0.75} M{c+ex+er} {ey-er*0.6} L{c+r*0.95} {c-r*0.4}" stroke="#14141C" stroke-width="{w}"/>')
+    return add_layers(svg, back, front)
+
+
+# ---------------------------------------------------------------- mini bosses (mid-run)
+MINI_BOSSES = {
+    "queen": ("blob", ("#FFC8F0", "#E04BC8", "#5A0A50")),
+    "turret": ("elite", ("#E4E8F0", "#7A869C", "#2A3244")),
+    "rhino": ("spiky", ("#E8C8A0", "#A8743A", "#4A2A0A")),
+    "magnet": ("spitter", ("#FFB0B0", "#E0303A", "#5E0A12")),
+}
+
+
+def mini_boss(name, size=384):
+    base, pal = MINI_BOSSES[name]
+    svg = recolor(virus(base, size, seed=11), KIND_PAL[base], pal)
+    c = size / 2
+    r = size * (0.30 if base != "blob" else 0.34)
+    back, front = [], []
+    if name == "queen":
+        # tiara and egg sacs full of minis
+        front.append(f'<path d="M{c-r*0.5} {c-r*0.82} L{c-r*0.4} {c-r*1.25} L{c-r*0.18} {c-r*1.0} L{c} {c-r*1.4} L{c+r*0.18} {c-r*1.0} L{c+r*0.4} {c-r*1.25} L{c+r*0.5} {c-r*0.82} Z" fill="#FFE45C" stroke="#7A5A00" stroke-width="5"/>')
+        for a in (0.5, 1.2, 1.95, 2.65):
+            x, y = c + math.cos(a) * r * 1.05, c + math.sin(a) * r * 1.05
+            front.append(f'<circle cx="{x}" cy="{y}" r="{r*0.22}" fill="#FFE0F6" stroke="#5A0A50" stroke-width="4" opacity=".95"/><circle cx="{x}" cy="{y}" r="{r*0.1}" fill="#FF3D6A"/>')
+    elif name == "turret":
+        # four cannon barrels and a radar dish
+        for a in (0, math.pi / 2, math.pi, 3 * math.pi / 2):
+            ca, sa = math.cos(a + math.pi / 4), math.sin(a + math.pi / 4)
+            x1, y1, x2, y2 = c + ca * r * 0.8, c + sa * r * 0.8, c + ca * r * 1.45, c + sa * r * 1.45
+            back.append(f'<line x1="{x1}" y1="{y1}" x2="{x2}" y2="{y2}" stroke="#2A3244" stroke-width="{r*0.34}" stroke-linecap="round"/><line x1="{x1}" y1="{y1}" x2="{x2}" y2="{y2}" stroke="#9AA6BC" stroke-width="{r*0.22}" stroke-linecap="round"/>')
+            back.append(f'<circle cx="{x2}" cy="{y2}" r="{r*0.08}" fill="#FF5A3A"/>')
+        front.append(f'<path d="M{c-r*0.35} {c-r*1.0} Q{c} {c-r*1.45} {c+r*0.35} {c-r*1.0} Z" fill="#C8D0DE" stroke="#2A3244" stroke-width="5"/><line x1="{c}" y1="{c-r*0.95}" x2="{c}" y2="{c-r*1.35}" stroke="#2A3244" stroke-width="5"/><circle cx="{c}" cy="{c-r*1.38}" r="7" fill="#FF5A3A"/>')
+    elif name == "rhino":
+        # big horn and armored brow
+        front.append(f'<path d="M{c-r*0.3} {c-r*0.7} Q{c-r*0.1} {c-r*1.7} {c+r*0.35} {c-r*1.75} Q{c+r*0.1} {c-r*1.3} {c+r*0.3} {c-r*0.7} Z" fill="#F6F1E4" stroke="#4A2A0A" stroke-width="6"/>')
+        front.append(f'<path d="M{c-r*0.8} {c-r*0.35} Q{c} {c-r*0.75} {c+r*0.8} {c-r*0.35} L{c+r*0.7} {c-r*0.55} Q{c} {c-r*0.95} {c-r*0.7} {c-r*0.55} Z" fill="#6A4A2A" stroke="#2A1A0A" stroke-width="5"/>')
+        for sx in (-1, 1):
+            front.append(f'<ellipse cx="{c+sx*r*0.18}" cy="{c+r*0.2}" rx="{r*0.07}" ry="{r*0.05}" fill="#2A1A0A"/>')
+    elif name == "magnet":
+        # horseshoe magnet on the head and field lines
+        front.append(f'<path d="M{c-r*0.5} {c-r*0.75} V{c-r*1.2} Q{c-r*0.5} {c-r*1.7} {c} {c-r*1.7} Q{c+r*0.5} {c-r*1.7} {c+r*0.5} {c-r*1.2} V{c-r*0.75} H{c+r*0.22} V{c-r*1.2} Q{c+r*0.22} {c-r*1.45} {c} {c-r*1.45} Q{c-r*0.22} {c-r*1.45} {c-r*0.22} {c-r*1.2} V{c-r*0.75} Z" fill="#E0303A" stroke="#5E0A12" stroke-width="5"/>')
+        front.append(f'<rect x="{c-r*0.5}" y="{c-r*0.95}" width="{r*0.28}" height="{r*0.2}" fill="#E8ECF4" stroke="#5E0A12" stroke-width="4"/><rect x="{c+r*0.22}" y="{c-r*0.95}" width="{r*0.28}" height="{r*0.2}" fill="#E8ECF4" stroke="#5E0A12" stroke-width="4"/>')
+        for k in (1.2, 1.45):
+            back.append(f'<circle cx="{c}" cy="{c}" r="{r*k}" fill="none" stroke="#5FB8FF" stroke-width="4" stroke-dasharray="14 12" opacity=".7"/>')
+    return add_layers(svg, back, front)
+
+
 # ---------------------------------------------------------------- pickups / fx
 def orb(size=96, color="#3FE6FF", core="#E8FFFF"):
     defs = f'''<radialGradient id="o" cx="40%" cy="35%" r="70%"><stop offset="0" stop-color="{core}"/><stop offset=".6" stop-color="{color}"/><stop offset="1" stop-color="{color}" stop-opacity=".2"/></radialGradient>
@@ -416,33 +547,104 @@ ORGANS = {
 }
 
 
-def backdrop(name, size=1024, seed=3):
-    deep, mid, accent = ORGANS[name]
-    rnd = random.Random(seed + len(name))
+# Second look for each organ (cities 2+ alternate): a sicker, more infected palette.
+ORGANS_ALT = {
+    "lungs": ("#1E0A26", "#4A1A5A", "#E07CFF"),
+    "heart": ("#200414", "#5A0A30", "#FF5A9A"),
+    "stomach": ("#1A1E06", "#46480E", "#E8FF4A"),
+    "brain": ("#0A1430", "#173A6A", "#6AC8FF"),
+    "marrow": ("#2A0E06", "#5A2410", "#FF8A4A"),
+}
+
+
+def backdrop(name, size=1024, seed=3, alt=False):
+    deep, mid, accent = (ORGANS_ALT if alt else ORGANS)[name]
+    rnd = random.Random(seed + len(name) + (101 if alt else 0))
     defs = f'''<radialGradient id="cell" cx="40%" cy="35%" r="70%"><stop offset="0" stop-color="{accent}" stop-opacity=".22"/><stop offset=".7" stop-color="{accent}" stop-opacity=".08"/><stop offset="1" stop-color="{accent}" stop-opacity="0"/></radialGradient>
     <radialGradient id="nuc"><stop offset="0" stop-color="{accent}" stop-opacity=".3"/><stop offset="1" stop-color="{accent}" stop-opacity="0"/></radialGradient>
+    <radialGradient id="spark"><stop offset="0" stop-color="#FFFFFF" stop-opacity=".9"/><stop offset=".3" stop-color="{accent}" stop-opacity=".6"/><stop offset="1" stop-color="{accent}" stop-opacity="0"/></radialGradient>
     <filter id="soft" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="3"/></filter>
     <filter id="blur" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="14"/></filter>'''
     parts = [f'<rect width="{size}" height="{size}" fill="{deep}"/>']
-    # big soft blobs
-    for i in range(10):
-        x, y, r = rnd.uniform(0, size), rnd.uniform(0, size), rnd.uniform(120, 260)
-        for dx in (-size, 0, size):
-            for dy in (-size, 0, size):
-                parts.append(f'<circle cx="{x+dx}" cy="{y+dy}" r="{r}" fill="{mid}" opacity=".35" filter="url(#blur)"/>')
-    # cells with membrane rings (wrapped for tiling)
-    for i in range(26):
-        x, y, r = rnd.uniform(0, size), rnd.uniform(0, size), rnd.uniform(26, 70)
+
+    def tiled(make, x, y, margin=160):
+        # Draws an element at every wrapped copy that touches the tile, so the texture tiles seamlessly.
         for dx in (-size, 0, size):
             for dy in (-size, 0, size):
                 cx, cy = x + dx, y + dy
-                if -100 < cx < size + 100 and -100 < cy < size + 100:
-                    parts.append(f'<g filter="url(#soft)"><circle cx="{cx}" cy="{cy}" r="{r}" fill="url(#cell)" stroke="{accent}" stroke-opacity=".18" stroke-width="3"/>'
-                                 f'<circle cx="{cx+r*0.15}" cy="{cy+r*0.1}" r="{r*0.32}" fill="url(#nuc)"/></g>')
+                if -margin < cx < size + margin and -margin < cy < size + margin:
+                    parts.append(make(cx, cy))
+
+    # big soft blobs for depth
+    for i in range(10):
+        x, y, r = rnd.uniform(0, size), rnd.uniform(0, size), rnd.uniform(120, 260)
+        tiled(lambda cx, cy, r=r: f'<circle cx="{cx}" cy="{cy}" r="{r}" fill="{mid}" opacity=".4" filter="url(#blur)"/>', x, y, 300)
+
+    if name == "lungs":
+        # bronchi branches and grape-like alveoli clusters
+        for i in range(5):
+            x, y, a = rnd.uniform(0, size), rnd.uniform(0, size), rnd.uniform(0, 6.3)
+            L = rnd.uniform(160, 260)
+            def br(cx, cy, a=a, L=L):
+                x2, y2 = cx + math.cos(a) * L, cy + math.sin(a) * L
+                out = f'<path d="M{cx} {cy} Q{cx+math.cos(a+0.4)*L*0.6} {cy+math.sin(a+0.4)*L*0.6} {x2} {y2}" stroke="{accent}" stroke-opacity=".16" stroke-width="16" fill="none" stroke-linecap="round"/>'
+                for s2 in (-0.6, 0.6):
+                    out += f'<path d="M{x2} {y2} L{x2+math.cos(a+s2)*L*0.4} {y2+math.sin(a+s2)*L*0.4}" stroke="{accent}" stroke-opacity=".13" stroke-width="9" stroke-linecap="round"/>'
+                return out
+            tiled(br, x, y, 300)
+        for i in range(16):
+            x, y, r = rnd.uniform(0, size), rnd.uniform(0, size), rnd.uniform(14, 26)
+            offs = [(rnd.uniform(-1.3, 1.3) * r, rnd.uniform(-1.3, 1.3) * r) for _ in range(6)]
+            tiled(lambda cx, cy, r=r, offs=offs: "".join(f'<circle cx="{cx+ox}" cy="{cy+oy}" r="{r}" fill="url(#cell)" stroke="{accent}" stroke-opacity=".22" stroke-width="2.5"/>' for ox, oy in offs), x, y)
+    elif name == "heart":
+        # vessels and red blood cell discs
+        for i in range(4):
+            y0, amp, ph = rnd.uniform(0, size), rnd.uniform(30, 70), rnd.uniform(0, 6)
+            d = "M0 " + " ".join(f"L{x} {y0 + math.sin(x / size * 2 * math.pi * 2 + ph) * amp}" for x in range(0, size + 1, 32))
+            for dy in (-size, 0, size):
+                parts.append(f'<path d="{d}" transform="translate(0 {dy})" stroke="{accent}" stroke-opacity=".12" stroke-width="34" fill="none"/>')
+        for i in range(34):
+            x, y, r, rot = rnd.uniform(0, size), rnd.uniform(0, size), rnd.uniform(14, 24), rnd.uniform(0, 180)
+            tiled(lambda cx, cy, r=r, rot=rot: f'<g transform="rotate({rot} {cx} {cy})"><ellipse cx="{cx}" cy="{cy}" rx="{r}" ry="{r*0.62}" fill="{accent}" opacity=".22"/><ellipse cx="{cx}" cy="{cy}" rx="{r*0.5}" ry="{r*0.28}" fill="{deep}" opacity=".35"/></g>', x, y)
+    elif name == "stomach":
+        # folds of villi and acid bubbles
+        for i in range(22):
+            x, y, h, rot = rnd.uniform(0, size), rnd.uniform(0, size), rnd.uniform(40, 80), rnd.uniform(-30, 30)
+            tiled(lambda cx, cy, h=h, rot=rot: f'<path d="M{cx-12} {cy+h/2} V{cy-h/2+12} Q{cx} {cy-h/2-6} {cx+12} {cy-h/2+12} V{cy+h/2}" transform="rotate({rot} {cx} {cy})" fill="{accent}" opacity=".13" stroke="{accent}" stroke-opacity=".22" stroke-width="2"/>', x, y)
+        for i in range(30):
+            x, y, r = rnd.uniform(0, size), rnd.uniform(0, size), rnd.uniform(5, 18)
+            tiled(lambda cx, cy, r=r: f'<circle cx="{cx}" cy="{cy}" r="{r}" fill="none" stroke="{accent}" stroke-opacity=".3" stroke-width="2"/><circle cx="{cx-r*0.35}" cy="{cy-r*0.35}" r="{r*0.2}" fill="#fff" opacity=".25"/>', x, y)
+    elif name == "brain":
+        # neuron network with glowing synapses
+        pts = [(rnd.uniform(0, size), rnd.uniform(0, size)) for _ in range(22)]
+        for i, (x, y) in enumerate(pts):
+            near = sorted(range(len(pts)), key=lambda j: (pts[j][0] - x) ** 2 + (pts[j][1] - y) ** 2)[1:3]
+            for j in near:
+                x2, y2 = pts[j]
+                tiled(lambda cx, cy, ddx=x2 - x, ddy=y2 - y: f'<path d="M{cx} {cy} Q{cx+ddx*0.5+20} {cy+ddy*0.5-20} {cx+ddx} {cy+ddy}" stroke="{accent}" stroke-opacity=".2" stroke-width="3" fill="none"/>', x, y, 400)
+            tiled(lambda cx, cy: f'<circle cx="{cx}" cy="{cy}" r="16" fill="{accent}" opacity=".18"/><circle cx="{cx}" cy="{cy}" r="26" fill="url(#spark)" opacity=".5"/>', x, y)
+    elif name == "marrow":
+        # spongy bone lattice and marrow cells
+        pts = [(rnd.uniform(0, size), rnd.uniform(0, size)) for _ in range(26)]
+        for i, (x, y) in enumerate(pts):
+            near = sorted(range(len(pts)), key=lambda j: (pts[j][0] - x) ** 2 + (pts[j][1] - y) ** 2)[1:4]
+            for j in near:
+                x2, y2 = pts[j]
+                tiled(lambda cx, cy, ddx=x2 - x, ddy=y2 - y: f'<line x1="{cx}" y1="{cy}" x2="{cx+ddx}" y2="{cy+ddy}" stroke="{accent}" stroke-opacity=".17" stroke-width="13" stroke-linecap="round"/>', x, y, 400)
+        for i in range(18):
+            x, y, r = rnd.uniform(0, size), rnd.uniform(0, size), rnd.uniform(14, 30)
+            tiled(lambda cx, cy, r=r: f'<circle cx="{cx}" cy="{cy}" r="{r}" fill="url(#cell)" stroke="{accent}" stroke-opacity=".2" stroke-width="2"/><circle cx="{cx}" cy="{cy}" r="{r*0.35}" fill="url(#nuc)"/>', x, y)
+    else:
+        # Endless: a lab simulation grid with floating cells
+        for k in range(0, size, 64):
+            parts.append(f'<path d="M{k} 0 V{size} M0 {k} H{size}" stroke="{accent}" stroke-opacity=".07" stroke-width="2"/>')
+        for i in range(20):
+            x, y, r = rnd.uniform(0, size), rnd.uniform(0, size), rnd.uniform(26, 70)
+            tiled(lambda cx, cy, r=r: f'<g filter="url(#soft)"><circle cx="{cx}" cy="{cy}" r="{r}" fill="url(#cell)" stroke="{accent}" stroke-opacity=".18" stroke-width="3"/><circle cx="{cx+r*0.15}" cy="{cy+r*0.1}" r="{r*0.32}" fill="url(#nuc)"/></g>', x, y)
     # tiny particles
-    for i in range(120):
+    for i in range(140):
         x, y = rnd.uniform(0, size), rnd.uniform(0, size)
-        parts.append(f'<circle cx="{x}" cy="{y}" r="{rnd.uniform(1.2,3)}" fill="{accent}" opacity="{rnd.uniform(.12,.35)}"/>')
+        parts.append(f'<circle cx="{x}" cy="{y}" r="{rnd.uniform(1.2,3.2)}" fill="{accent}" opacity="{rnd.uniform(.15,.4)}"/>')
     return wrap("".join(parts), size, size, defs)
 
 
@@ -575,10 +777,17 @@ if __name__ == "__main__":
         items.append((f"boss-{k}", boss(k)))
         for v in BOSS_VARIANTS:
             items.append((f"boss-{k}-{v}", boss_variant(k, v)))
+    for k in STRAIN_KINDS:
+        for st in STRAINS:
+            items.append((f"virus-{k}-{st}", strain_virus(k, st)))
+    for m in MINI_BOSSES:
+        items.append((f"miniboss-{m}", mini_boss(m)))
     items += [("orb", orb()), ("orb-big", orb(96, "#FFE45C", "#FFFFE0")), ("coin", coin()), ("heart", heart()), ("chest", chest()),
               ("glow", glow()), ("glow-pink", glow(128, "#FF6BD5")), ("glow-gold", glow(128, "#FFE45C")), ("bolt", bolt()), ("bomb", bomb()), ("slime", slime())]
     for o in ORGANS:
         items.append((f"bg-{o}", backdrop(o)))
+        if o in ORGANS_ALT:
+            items.append((f"bg-{o}-2", backdrop(o, alt=True)))
     items += [("dr-leuko", leuko()), ("king-vex", vex())]
     items.append(("icon", icon()))
     asyncio.run(render(items))

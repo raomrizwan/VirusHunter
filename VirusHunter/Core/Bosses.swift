@@ -100,3 +100,58 @@ extension Organ {
         return out
     }
 }
+
+// MARK: - City strains, mini bosses, backgrounds
+
+/// From the second city on, the regular viruses of each city wear a new look (horns, crystals,
+/// helmets...), so every outbreak has its own army. Shuffled per country like the mutations.
+enum VirusStrain: String, CaseIterable {
+    case horned, crystal, armored, punk, cyclops, zombie, gold, ninja, pirate
+
+    var title: String { "\(rawValue.prefix(1).uppercased())\(rawValue.dropFirst()) Strain" }
+    /// Kinds that change their look (the special viruses keep theirs).
+    static let kinds: [EnemyKind] = [.spiky, .mini, .blob, .dart, .spitter, .elite]
+    /// Color the arena takes on in this city.
+    var tint: (r: Double, g: Double, b: Double) {
+        switch self {
+        case .horned: return (1, 0.25, 0.25)
+        case .crystal: return (0.35, 0.9, 1)
+        case .armored: return (0.6, 0.66, 0.78)
+        case .punk: return (0.95, 0.25, 0.8)
+        case .cyclops: return (1, 0.62, 0.15)
+        case .zombie: return (0.55, 0.68, 0.45)
+        case .gold: return (0.95, 0.76, 0.2)
+        case .ninja: return (0.3, 0.3, 0.42)
+        case .pirate: return (0.15, 0.8, 0.62)
+        }
+    }
+
+    /// City 1 has the original viruses; cities 2-10 each get a different strain.
+    static func forCity(_ level: Int, country: String) -> VirusStrain? {
+        guard level >= 2 else { return nil }
+        var rng = citySeed(country, 0, salt: 31_337)
+        let order = allCases.shuffled(using: &rng)
+        return order[(level - 2) % order.count]
+    }
+}
+
+extension EnemyKind {
+    /// Texture in a city strain ("virus-spiky-horned"); special viruses and bosses keep their own.
+    func texture(strain: VirusStrain?) -> String {
+        guard let strain, VirusStrain.kinds.contains(self) else { return texture }
+        return "\(texture)-\(strain.rawValue)"
+    }
+}
+
+extension Organ {
+    func strain(country: String) -> VirusStrain? { isEndless ? nil : VirusStrain.forCity(infection, country: country) }
+
+    /// The mini boss that shows up mid-run (a different one per organ and city).
+    func miniBoss(country: String) -> EnemyKind {
+        var rng = citySeed(country, infection, salt: 4_243 &+ UInt64(id))
+        return EnemyKind.miniBosses.randomElement(using: &rng) ?? .miniQueen
+    }
+
+    /// Arena background: even cities use the organ's second, more infected look.
+    var backdrop: String { !isEndless && infection % 2 == 0 ? "bg-\(key)-2" : "bg-\(key)" }
+}
