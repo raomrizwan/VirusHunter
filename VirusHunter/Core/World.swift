@@ -71,7 +71,8 @@ extension SaveData {
 
     /// Can this organ be played at this Infection Level (city)?
     func canPlay(_ organID: Int, level: Int) -> Bool {
-        if level == 1 { return organID <= unlockedStage }
+        // First city: organs open one by one in each country's own campaign.
+        if level == 1 { return organID == 1 || clearedInfection(organID - 1) >= 1 }
         return level <= unlockedInfection(organID)
     }
 
@@ -115,7 +116,7 @@ extension SaveData {
     /// City-reward weapons not earned yet.
     var lockedWeapons: Set<WeaponKind> {
         var out = WeaponKind.cityRewards
-        for c in stride(from: 1, through: citiesCleared, by: 1) {
+        for c in stride(from: 1, through: bestCities, by: 1) {
             if case .weapon(let w) = CityReward.forCity(c) { out.remove(w) }
         }
         return out

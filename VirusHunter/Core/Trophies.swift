@@ -77,18 +77,18 @@ enum Trophy: String, CaseIterable, Identifiable {
         switch self {
         case .firstBoss: return (s.clearedStages.isEmpty ? 0 : 1, 1)
         case .kills1k: return (s.totalKills, 1_000)
-        case .firstCity: return (s.citiesCleared, 1)
+        case .firstCity: return (s.bestCities, 1)
         case .evolved: return (s.everEvolved ? 1 : 0, 1)
         case .endless5: return (Int(s.bestEndless), 300)
-        case .cities3: return (s.citiesCleared, 3)
+        case .cities3: return (s.citiesSavedEverywhere, 3)
         case .streak7: return (s.bestStreak, 7)
         case .dailyAll: return (s.dailyBonuses, 3)
         case .goldenVirus: return (s.goldenCaught, 5)
-        case .fiveCities: return (s.citiesCleared, 5)
+        case .fiveCities: return (s.citiesSavedEverywhere, 5)
         case .mutant: return (s.ranks.values.reduce(0, +), 10)
         case .endless10: return (Int(s.bestEndless), 600)
         case .kills10k: return (s.totalKills, 10_000)
-        case .countrySaved: return (s.citiesCleared, Organ.maxInfection)
+        case .countrySaved: return (s.bestCities, Organ.maxInfection)
         }
     }
 

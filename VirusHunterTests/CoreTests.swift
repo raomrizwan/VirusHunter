@@ -88,7 +88,7 @@ final class CoreTests: XCTestCase {
         let d = UserDefaults(suiteName: "vh-test")!
         d.removePersistentDomain(forName: "vh-test")
         let store = SaveStore(defaults: d)
-        var s = SaveData(); s.coins = 77; s.clearedStages = [1]; s.tech = ["speed": 3]
+        var s = SaveData(); s.coins = 77; s.clearedStages = [1]; s.infectionCleared = ["1": 1]; s.tech = ["speed": 3]
         store.save(s)
         XCTAssertEqual(store.load(), s)
     }
@@ -153,7 +153,7 @@ final class CoreTests: XCTestCase {
         s.recordClear(Organ.all[0].at(infection: 2))
         XCTAssertEqual(s.nextMission, Organ.all[1].at(infection: 2))
         // Older saves that only know clearedStages keep their progress.
-        var old = SaveData(); old.clearedStages = [1, 2, 3, 4, 5]; old.unlockedStage = 5
+        let old = try! JSONDecoder().decode(SaveData.self, from: Data(#"{"clearedStages": [1, 2, 3, 4, 5], "unlockedStage": 5}"#.utf8))
         XCTAssertEqual(old.currentCity, 2)
     }
 
@@ -448,5 +448,30 @@ final class CoreTests: XCTestCase {
         XCTAssertTrue(old.discovered.isEmpty)
         XCTAssertNil(old.allyID)
         XCTAssertEqual(old.bestCombo, 0)
+    }
+
+    func testEachCountryIsItsOwnCampaign() {
+        var s = SaveData()
+        s.switchCountry(to: "PK")
+        for o in Organ.all { s.recordClear(o) }
+        XCTAssertEqual(s.citiesCleared, 1)
+        s.switchCountry(to: "IN")
+        XCTAssertEqual(s.citiesCleared, 0, "New Delhi is not saved just because Islamabad was")
+        XCTAssertEqual(s.currentCity, 1)
+        XCTAssertTrue(s.canPlay(1, level: 1))
+        XCTAssertFalse(s.canPlay(2, level: 1), "each campaign starts from the Lungs")
+        XCTAssertEqual(s.bestCities, 1, "unlocks earned in Pakistan stay")
+        XCTAssertTrue(s.ownsAlly(.medic))
+        XCTAssertEqual(s.citiesSaved(in: "PK"), 1)
+        XCTAssertEqual(s.citiesSavedEverywhere, 1)
+        s.recordClear(Organ.all[0])
+        s.switchCountry(to: "PK")
+        XCTAssertEqual(s.citiesCleared, 1, "Pakistan progress comes back")
+        XCTAssertEqual(s.citiesSaved(in: "IN"), 0)
+        XCTAssertEqual(s.countryProgress["IN"]?["1"], 1)
+        // The first country pick keeps what a player did before choosing.
+        var fresh = SaveData(); fresh.recordClear(Organ.all[0])
+        fresh.switchCountry(to: "GB")
+        XCTAssertEqual(fresh.clearedInfection(1), 1)
     }
 }

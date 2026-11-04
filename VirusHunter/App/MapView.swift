@@ -82,7 +82,7 @@ struct MapView: View {
     private func focusActiveCity() {
         city = model.save.currentCity
         if let next = model.save.nextMission, next.infection == city { selected = next.id }
-        else { selected = min(model.save.unlockedStage, 5) }
+        else { selected = Organ.all.last { model.save.canPlay($0.id, level: city) }?.id ?? 1 }
     }
 
     // MARK: cities

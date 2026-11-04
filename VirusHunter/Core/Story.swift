@@ -177,7 +177,7 @@ enum Story {
     static func intro(for organ: Organ, save: SaveData) -> StoryScene? {
         let id = organ.isEndless ? "endless" : "intro-\(organ.id)"
         guard !save.seenStory.contains(id) else { return nil }
-        if !organ.isEndless && (organ.infection > 1 || save.clearedStages.contains(organ.id)) { return nil }
+        if !organ.isEndless && (organ.infection > 1 || save.clearedInfection(organ.id) >= 1) { return nil }
         return scene(id).map { resolve($0, country: save.country, city: 1) }
     }
 
@@ -211,7 +211,7 @@ enum Story {
         }
         let newlyCleared = before.clearedInfection(organ.id) < organ.infection && after.clearedInfection(organ.id) >= organ.infection
         let id = "outro-\(organ.id)"
-        if organ.infection == 1, !before.clearedStages.contains(organ.id), !after.seenStory.contains(id), var s = scene(id) {
+        if organ.infection == 1, before.clearedInfection(organ.id) < 1, !after.seenStory.contains(id), var s = scene(id) {
             // A brand-new player skips the Lungs intro (they start straight in a run), so meet Dr. Leuko here.
             if organ.id == 1, !after.seenStory.contains("intro-1"), let intro = scene("intro-1") {
                 s = StoryScene(id: s.id, title: s.title, lines: Array(intro.lines.prefix(2)) + s.lines)

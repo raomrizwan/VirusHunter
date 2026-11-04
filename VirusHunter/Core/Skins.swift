@@ -60,7 +60,7 @@ extension SaveData {
     func owns(_ s: Skin) -> Bool {
         if s == .classic || ownedSkins.contains(s.rawValue) { return true }
         if let st = s.clearStage { return clearedStages.contains(st) }
-        if let c = s.cityReward { return citiesCleared >= c }
+        if let c = s.cityReward { return bestCities >= c }
         return false
     }
 

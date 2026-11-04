@@ -39,7 +39,7 @@ enum Ally: String, CaseIterable, Identifiable {
 }
 
 extension SaveData {
-    func ownsAlly(_ a: Ally) -> Bool { a == .medic ? citiesCleared >= 1 || ownedAllies.contains(a.rawValue) : ownedAllies.contains(a.rawValue) }
+    func ownsAlly(_ a: Ally) -> Bool { a == .medic ? bestCities >= 1 || ownedAllies.contains(a.rawValue) : ownedAllies.contains(a.rawValue) }
 
     /// The ally flying with Nano (nil = none recruited or picked).
     var ally: Ally? {

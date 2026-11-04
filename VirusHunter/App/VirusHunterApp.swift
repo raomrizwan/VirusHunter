@@ -27,7 +27,7 @@ final class AppModel: ObservableObject {
         if AppModel.args.contains("-resetProgress") { UserDefaults.standard.removeObject(forKey: "vh2.save") }
         var s = SaveStore.shared.load()
         if AppModel.args.contains("-demoProgress") {
-            s.coins = 2480; s.unlockedStage = 3; s.clearedStages = [1, 2]; s.seenIntro = true
+            s.coins = 2480; s.unlockedStage = 3; s.clearedStages = [1, 2]; s.infectionCleared = ["1": 1, "2": 1]; s.seenIntro = true
             s.tech = ["power": 4, "health": 3, "speed": 2, "magnet": 3]
         }
         if AppModel.args.contains("-skipIntro") { s.seenIntro = true }
@@ -92,7 +92,7 @@ final class AppModel: ObservableObject {
     }
 
     func setCountry(_ code: String) {
-        save.countryCode = code
+        save.switchCountry(to: code)
         persist()
         withAnimation { pickingCountry = false }
         checkMapStory()

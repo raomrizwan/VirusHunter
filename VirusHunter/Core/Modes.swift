@@ -71,7 +71,7 @@ enum BossRush {
 }
 
 extension SaveData {
-    var bossRushUnlocked: Bool { citiesCleared >= 1 }
+    var bossRushUnlocked: Bool { bestCities >= 1 }
     /// Best Boss Rush time this week (nil = not beaten yet).
     func bossRushBest(week: String = BossRush.week()) -> Double? { bossRushBests[week] }
 }

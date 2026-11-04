@@ -28,6 +28,11 @@ struct CountryPicker: View {
                                             .font(Theme.body(12)).foregroundStyle(Theme.muted).lineLimit(1)
                                     }
                                     Spacer()
+                                    let saved = model.save.citiesSaved(in: c.id)
+                                    if saved > 0 {
+                                        Text("\(saved)/\(Organ.maxInfection)").font(Theme.body(12, .heavy)).foregroundStyle(saved >= Organ.maxInfection ? Theme.gold : Theme.lime)
+                                            .padding(.horizontal, 8).padding(.vertical, 4).background(Capsule().fill(.white.opacity(0.1)))
+                                    }
                                     if selected == c.id {
                                         Image(systemName: "checkmark.circle.fill").font(.system(size: 22)).foregroundStyle(Theme.lime)
                                     }
@@ -47,8 +52,8 @@ struct CountryPicker: View {
                 }
                 .accessibilityIdentifier("countryConfirm")
                 if model.save.countryCode != nil {
-                    Text("Your progress stays the same. Only the city names change.")
-                        .font(Theme.body(12)).foregroundStyle(Theme.muted)
+                    Text("Every country is its own campaign. Your progress in other countries is kept, and so are your upgrades.")
+                        .font(Theme.body(12)).foregroundStyle(Theme.muted).multilineTextAlignment(.center)
                     Button("Cancel") { withAnimation { model.pickingCountry = false } }
                         .font(Theme.body(15, .bold)).foregroundStyle(.white.opacity(0.8))
                 }

@@ -80,6 +80,11 @@ struct SaveData: Codable, Equatable {
     var allyID: String?                         // ally flying with Nano
     var bossRushBests: [String: Double] = [:]   // week -> best Boss Rush time
     var bestCombo = 0
+    /// Each country is its own campaign: organ -> Infection Level cleared, for the countries not
+    /// active right now (the active country's progress lives in `infectionCleared`).
+    var countryProgress: [String: [String: Int]] = [:]
+    /// Most cities ever saved in one country (city rewards, allies and Boss Rush stay unlocked).
+    var bestCities = 0
 
     func level(_ t: TechKind) -> Int { tech[t.rawValue] ?? 0 }
     func rank(_ t: TechKind) -> Int { ranks[t.rawValue] ?? 0 }
@@ -103,9 +108,7 @@ struct SaveData: Codable, Equatable {
     }
 
     /// Highest Infection Level cleared for an organ (0 = never cleared).
-    func clearedInfection(_ organID: Int) -> Int {
-        max(infectionCleared[String(organID)] ?? 0, clearedStages.contains(organID) ? 1 : 0)
-    }
+    func clearedInfection(_ organID: Int) -> Int { infectionCleared[String(organID)] ?? 0 }
     /// Highest Infection Level (city) the player may start for an organ: one above what it has cleared,
     /// but never past the active city (every organ must be cleared in a city before the next opens).
     func unlockedInfection(_ organID: Int) -> Int {
@@ -117,6 +120,39 @@ struct SaveData: Codable, Equatable {
         clearedStages.insert(o.id)
         unlockedStage = max(unlockedStage, min(5, o.id + 1))
         infectionCleared[String(o.id)] = max(clearedInfection(o.id), o.infection)
+        bestCities = max(bestCities, citiesCleared)
+    }
+
+    /// Moves to another country's campaign: the current one is put away, the new one starts fresh
+    /// (or where the player left it). Upgrades, coins, skins and unlocks stay.
+    mutating func switchCountry(to code: String) {
+        guard code != countryCode else { return }
+        if let old = countryCode { countryProgress[old] = infectionCleared }
+        else if !infectionCleared.isEmpty { countryProgress[code] = infectionCleared } // first pick keeps what was played
+        infectionCleared = countryProgress.removeValue(forKey: code) ?? [:]
+        countryCode = code
+        // City story scenes play again with the new city names.
+        seenStory = seenStory.filter { !($0.hasPrefix("city-") || $0.hasPrefix("vaccine-") || $0 == "clear-1" || $0 == "finale") }
+    }
+
+    /// Cities saved in one country's campaign.
+    func citiesSaved(in code: String) -> Int {
+        if code == countryCode { return citiesCleared }
+        guard let p = countryProgress[code] else { return 0 }
+        return Organ.all.map { p[String($0.id)] ?? 0 }.min() ?? 0
+    }
+
+    /// Cities saved in every country together (leaderboard).
+    var citiesSavedEverywhere: Int {
+        countryProgress.values.reduce(citiesCleared) { total, p in
+            total + (Organ.all.map { p[String($0.id)] ?? 0 }.min() ?? 0)
+        }
+    }
+
+    /// Countries whose ten cities are all saved.
+    var countriesSaved: Int {
+        countryProgress.values.filter { p in Organ.all.allSatisfy { (p[String($0.id)] ?? 0) >= Organ.maxInfection } }.count
+            + (citiesCleared >= Organ.maxInfection ? 1 : 0)
     }
 
     var endlessUnlocked: Bool { clearedStages.contains(2) }
@@ -154,6 +190,11 @@ extension SaveData {
         allyID = try c.decodeIfPresent(String.self, forKey: .allyID)
         bossRushBests = try c.decodeIfPresent([String: Double].self, forKey: .bossRushBests) ?? d.bossRushBests
         bestCombo = try c.decodeIfPresent(Int.self, forKey: .bestCombo) ?? d.bestCombo
+        countryProgress = try c.decodeIfPresent([String: [String: Int]].self, forKey: .countryProgress) ?? d.countryProgress
+        // Older saves only knew clearedStages: those count as the first city of the current country.
+        for id in clearedStages where (infectionCleared[String(id)] ?? 0) < 1 { infectionCleared[String(id)] = 1 }
+        bestCities = try c.decodeIfPresent(Int.self, forKey: .bestCities) ?? d.bestCities
+        bestCities = max(bestCities, citiesCleared)
     }
 }
 
