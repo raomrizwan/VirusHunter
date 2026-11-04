@@ -113,8 +113,8 @@ struct HomeView: View {
                 .scaleEffect(pulse ? 1.05 : 0.95)
             Circle().fill(RadialGradient(colors: [Theme.cyan.opacity(0.35), .clear], center: .center, startRadius: 10, endRadius: 150)).frame(width: 300, height: 300)
             ForEach(0..<5) { i in
-                Image(s.skin.botTexture).resizable().frame(width: 30, height: 30)
-                    .offset(x: 105)
+                Image(s.skin.botTexture).resizable().frame(width: 26, height: 26)
+                    .offset(x: 92)
                     .rotationEffect(.degrees(Double(i) * 72 + (spin ? 360 : 0)))
             }
             Button { model.go(.skins) } label: {

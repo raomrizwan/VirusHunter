@@ -42,7 +42,7 @@ struct GameContent: View {
         ZStack {
             SpriteView(scene: holder.scene, preferredFramesPerSecond: 60, options: [.ignoresSiblingOrder])
                 .ignoresSafeArea()
-            HUD(state: st, onPause: { holder.scene.pauseRun() })
+            if !isFinished(st.phase) { HUD(state: st, onPause: { holder.scene.pauseRun() }) }
             if st.moveHint && st.phase == .playing { MoveHint().transition(.opacity) }
             overlay(st)
         }
@@ -59,6 +59,8 @@ struct GameContent: View {
             }
         }
     }
+
+    private func isFinished(_ p: RunState.Phase) -> Bool { if case .finished = p { return true } else { return false } }
 
     @ViewBuilder private func overlay(_ st: RunState) -> some View {
         switch st.phase {
@@ -433,14 +435,14 @@ struct ResultView: View {
 
     var body: some View {
         ZStack {
-            Color.black.opacity(0.7).ignoresSafeArea()
+            Color.black.opacity(0.86).ignoresSafeArea()
             GeometryReader { g in
             ScrollView(showsIndicators: false) {
-            VStack(spacing: 16) {
-                Image(save.skin.texture(won ? .joy : .hurt)).resizable().scaledToFit().frame(width: unlocks.isEmpty ? 140 : 110)
+            VStack(spacing: 11) {
+                Image(save.skin.texture(won ? .joy : .hurt)).resizable().scaledToFit().frame(width: unlocks.isEmpty ? 120 : 76)
                     .scaleEffect(appear ? 1 : 0.5).rotationEffect(.degrees(appear ? 0 : -20))
                 Text(won ? "\(organ.name.uppercased()) CLEARED!" : organ.isEndless ? "YOU SURVIVED" : "INFECTED!")
-                    .font(Theme.title(32)).foregroundStyle(won ? Theme.lime : .white).multilineTextAlignment(.center)
+                    .font(Theme.title(28)).foregroundStyle(won ? Theme.lime : .white).multilineTextAlignment(.center)
                 if !organ.isSideMode {
                     Label("\(save.country.city(organ.infection)), \(save.country.name)", systemImage: "mappin.and.ellipse")
                         .font(Theme.body(14, .bold)).foregroundStyle(Theme.muted)
@@ -453,11 +455,11 @@ struct ResultView: View {
                 if let r = reward {
                     HStack(spacing: 8) {
                         Image("coin").resizable().frame(width: 34, height: 34)
-                        Text("+\(r.coins)").font(Theme.title(38)).foregroundStyle(Theme.gold).monospacedDigit().contentTransition(.numericText())
+                        Text("+\(r.coins)").font(Theme.title(32)).foregroundStyle(Theme.gold).monospacedDigit().contentTransition(.numericText())
                     }
                     .padding(.vertical, 4)
                     if !r.doubled && r.coins > 0 {
-                        GameButton(title: "Double coins", icon: "play.rectangle.fill", kind: .reward, height: 56, action: onDouble)
+                        GameButton(title: "Double coins", icon: "play.rectangle.fill", kind: .reward, height: 50, action: onDouble)
                             .accessibilityIdentifier("doubleButton")
                     }
                 }
@@ -465,16 +467,17 @@ struct ResultView: View {
                     VaccineLabCard(onDone: onVaccine)
                 }
                 ForEach(unlocks, id: \.self) { u in
-                    Label(u, systemImage: u.contains("cured") ? "cross.case.fill" : u.hasPrefix("Daily") ? "star.fill" : "lock.open.fill").font(Theme.body(16, .heavy)).foregroundStyle(Theme.lime)
+                    Label(u, systemImage: u.contains("cured") ? "cross.case.fill" : u.hasPrefix("Daily") ? "star.fill" : "lock.open.fill").font(Theme.body(13, .heavy)).foregroundStyle(Theme.lime)
+                        .lineLimit(2).minimumScaleFactor(0.8).frame(maxWidth: .infinity, alignment: .leading)
                 }
-                if let r = reward, let g = save.nextGoal {
+                if let r = reward, let g = save.nextGoal, unlocks.count < 3 {
                     GoalCard(goal: g, coins: save.coins, earned: r.coins)
                 }
                 if won && !organ.isSideMode, let next = save.nextMission {
-                    GameButton(title: "Next: \(next.name) · \(save.country.city(next.infection))", icon: "arrow.right", action: onNext)
+                    GameButton(title: "Next: \(next.name) · \(save.country.city(next.infection))", icon: "arrow.right", height: 56, action: onNext)
                         .accessibilityIdentifier("nextButton")
                 }
-                GameButton(title: "Continue", kind: .secondary, height: 52, action: onDone)
+                GameButton(title: "Continue", kind: .secondary, height: 46, action: onDone)
                     .accessibilityIdentifier("continueButton")
             }
             .padding(.horizontal, 28).padding(.vertical, 20)
@@ -486,12 +489,14 @@ struct ResultView: View {
     }
 
     private func stat(_ t: String, _ v: String, _ icon: String) -> some View {
-        VStack(spacing: 4) {
-            Image(systemName: icon).font(.system(size: 16, weight: .bold)).foregroundStyle(Theme.cyan)
-            Text(v).font(Theme.body(20, .heavy)).foregroundStyle(.white).monospacedDigit()
-            Text(t).font(Theme.body(12)).foregroundStyle(Theme.muted)
+        VStack(spacing: 2) {
+            HStack(spacing: 5) {
+                Image(systemName: icon).font(.system(size: 13, weight: .bold)).foregroundStyle(Theme.cyan)
+                Text(v).font(Theme.body(17, .heavy)).foregroundStyle(.white).monospacedDigit()
+            }
+            Text(t).font(Theme.body(11)).foregroundStyle(Theme.muted)
         }
-        .frame(maxWidth: .infinity).padding(.vertical, 12).glass(16)
+        .frame(maxWidth: .infinity).padding(.vertical, 8).glass(14)
     }
 }
 
