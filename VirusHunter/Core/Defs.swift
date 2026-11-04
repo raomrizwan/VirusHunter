@@ -200,7 +200,10 @@ struct Organ: Identifiable, Equatable {
     let key: String      // background texture key
     let boss: EnemyKind
     let tagline: String
+    /// Infection Level (1...maxInfection). Cleared organs can be replayed at higher levels for bigger rewards.
+    var infection: Int = 1
 
+    static let maxInfection = 10
     static let all: [Organ] = [
         Organ(id: 1, name: "Lungs", key: "lungs", boss: .bossSumo, tagline: "Clear the airways."),
         Organ(id: 2, name: "Heart", key: "heart", boss: .bossCowboy, tagline: "Keep the blood flowing."),
@@ -211,11 +214,23 @@ struct Organ: Identifiable, Equatable {
     static let endless = Organ(id: 0, name: "Endless", key: "endless", boss: .bossRoyal, tagline: "How long can you last?")
 
     var isEndless: Bool { id == 0 }
+    /// This organ at another Infection Level (clamped to 1...maxInfection).
+    func at(infection level: Int) -> Organ { var o = self; o.infection = max(1, min(Organ.maxInfection, level)); return o }
+    /// Extra steps above Infection Level 1.
+    private var heat: Double { isEndless ? 0 : Double(infection - 1) }
     /// Stage difficulty multiplier for enemy health and damage.
-    var difficulty: Double { isEndless ? 1.4 : 1 + 0.55 * Double(id - 1) }
+    var difficulty: Double { (isEndless ? 1.4 : 1 + 0.55 * Double(id - 1)) * (1 + 0.4 * heat) }
+    /// Enemy speed multiplier from Infection Level.
+    var speedScale: Double { 1 + 0.03 * heat }
+    /// Spawn rate multiplier from Infection Level.
+    var spawnScale: Double { 1 + 0.07 * heat }
+    /// Seconds between elite viruses (they come faster at higher Infection Levels).
+    var eliteInterval: Double { max(30, 60 - 3 * heat) }
     /// Seconds until the boss appears.
     var bossTime: Double { isEndless ? 180 : 240 }
-    var coinReward: Int { isEndless ? 0 : 60 + 30 * id }
+    var coinReward: Int { isEndless ? 0 : Int(Double(60 + 30 * id) * (1 + 0.6 * heat)) }
+    /// Multiplier on coins picked up and earned from kills.
+    var coinScale: Double { 1 + 0.15 * heat }
 }
 
 /// Spawn schedule: which kinds appear and how fast, as a function of elapsed time.
@@ -225,7 +240,7 @@ enum Spawner {
         let stage = organ.isEndless ? 3 : organ.id
         let base = 1.5 + 0.2 * Double(stage - 1)
         let warmup = min(1, 0.55 + t / 45) // gentler first ~20 s
-        return min(18, base * (1 + t / 32) * warmup)
+        return min(18 * organ.spawnScale, base * (1 + t / 32) * warmup * organ.spawnScale)
     }
 
     static func kinds(time t: Double) -> [(EnemyKind, Double)] {

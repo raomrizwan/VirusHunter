@@ -129,4 +129,39 @@ final class CoreTests: XCTestCase {
         let already = Rookie.featureSwarm([.weapon(.swarm, toLevel: 1), .heal, .coins(25)], loadout: l)
         XCTAssertEqual(already, [.weapon(.swarm, toLevel: 1), .heal, .coins(25)])
     }
+
+    func testInfectionLevelsUnlockAfterClears() {
+        var s = SaveData()
+        XCTAssertEqual(s.unlockedInfection(1), 1)
+        s.recordClear(Organ.all[0])
+        XCTAssertEqual(s.unlockedInfection(1), 2)
+        s.recordClear(Organ.all[0].at(infection: 2))
+        XCTAssertEqual(s.clearedInfection(1), 2)
+        XCTAssertEqual(s.unlockedInfection(1), 3)
+        s.recordClear(Organ.all[0].at(infection: 10))
+        XCTAssertEqual(s.unlockedInfection(1), Organ.maxInfection)
+        // Older saves that only know clearedStages still open Level 2.
+        var old = SaveData(); old.clearedStages = [3]
+        XCTAssertEqual(old.unlockedInfection(3), 2)
+    }
+
+    func testInfectionLevelScalesDifficultyAndCoins() {
+        let base = Organ.all[0], hot = base.at(infection: 5)
+        XCTAssertGreaterThan(hot.difficulty, base.difficulty)
+        XCTAssertGreaterThan(hot.coinReward, base.coinReward)
+        XCTAssertEqual(Organ.endless.at(infection: 5).difficulty, Organ.endless.difficulty)
+    }
+
+    func testMutationRanksAfterMax() {
+        var s = SaveData(); s.tech = ["power": 10]; s.coins = 2000
+        XCTAssertEqual(s.nextCost(.power), 2000)
+        XCTAssertTrue(s.buy(.power))
+        XCTAssertEqual(s.level(.power), 10)
+        XCTAssertEqual(s.rank(.power), 1)
+        XCTAssertEqual(s.coins, 0)
+        XCTAssertEqual(PlayerStats.make(save: s, loadout: Loadout()).damage, 1 + 0.05 * 10.4, accuracy: 0.0001)
+        var r = SaveData(); r.tech = ["revive": 1]; r.coins = 99999
+        XCTAssertNil(r.nextCost(.revive))
+        XCTAssertFalse(r.buy(.revive))
+    }
 }

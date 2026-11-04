@@ -27,14 +27,21 @@ enum TechKind: String, CaseIterable, Codable, Identifiable {
         }
     }
     var maxLevel: Int { self == .revive ? 1 : 10 }
-    func effect(_ level: Int) -> String {
+    /// Mutation Ranks: smaller upgrades bought after a tech is MAX, so coins always have a use.
+    var maxRank: Int { self == .revive ? 0 : 50 }
+    /// How much one Mutation Rank is worth compared with one regular level.
+    var rankWeight: Double { self == .speed ? 0.2 : 0.4 }
+    func rankCost(toRank r: Int) -> Int { 2000 + 400 * (r - 1) }
+    func effect(_ level: Int, rank: Int = 0) -> String {
+        let v = Double(level) + rankWeight * Double(rank)
+        func n(_ x: Double) -> String { x == x.rounded() ? "\(Int(x))" : String(format: "%.1f", x) }
         switch self {
-        case .power: return "+\(level * 5)% damage"
-        case .armor: return "−\(level * 3)% damage taken"
-        case .health: return "+\(level * 10) max health"
-        case .speed: return "+\(level * 3)% speed"
-        case .magnet: return "+\(level * 8)% pickup range"
-        case .greed: return "+\(level * 8)% Bio-Coins"
+        case .power: return "+\(n(v * 5))% damage"
+        case .armor: return "−\(n(min(50, v * 3)))% damage taken"
+        case .health: return "+\(n(v * 10)) max health"
+        case .speed: return "+\(n(v * 3))% speed"
+        case .magnet: return "+\(n(v * 8))% pickup range"
+        case .greed: return "+\(n(v * 8))% Bio-Coins"
         case .revive: return level > 0 ? "One free revive per run" : "Revive once per run for free"
         }
     }
@@ -58,17 +65,42 @@ struct SaveData: Codable, Equatable {
     var seenIntro: Bool = false
     var ownedSkins: Set<String> = []
     var skinID: String = Skin.classic.rawValue
+    var ranks: [String: Int] = [:]              // Mutation Ranks bought after a tech is MAX
+    var infectionCleared: [String: Int] = [:]   // organ id -> highest Infection Level cleared
 
     func level(_ t: TechKind) -> Int { tech[t.rawValue] ?? 0 }
+    func rank(_ t: TechKind) -> Int { ranks[t.rawValue] ?? 0 }
+    /// Level plus Mutation Ranks, in regular-level units, used for stats.
+    func power(_ t: TechKind) -> Double { Double(level(t)) + t.rankWeight * Double(rank(t)) }
+
+    /// Price of the next purchase for this tech: a level, then a Mutation Rank, nil when fully maxed.
+    func nextCost(_ t: TechKind) -> Int? {
+        let l = level(t)
+        if l < t.maxLevel { return t.cost(toLevel: l + 1) }
+        let r = rank(t)
+        return r < t.maxRank ? t.rankCost(toRank: r + 1) : nil
+    }
 
     mutating func buy(_ t: TechKind) -> Bool {
-        let l = level(t)
-        guard l < t.maxLevel else { return false }
-        let c = t.cost(toLevel: l + 1)
-        guard coins >= c else { return false }
+        guard let c = nextCost(t), coins >= c else { return false }
         coins -= c
-        tech[t.rawValue] = l + 1
+        let l = level(t)
+        if l < t.maxLevel { tech[t.rawValue] = l + 1 } else { ranks[t.rawValue] = rank(t) + 1 }
         return true
+    }
+
+    /// Highest Infection Level cleared for an organ (0 = never cleared).
+    func clearedInfection(_ organID: Int) -> Int {
+        max(infectionCleared[String(organID)] ?? 0, clearedStages.contains(organID) ? 1 : 0)
+    }
+    /// Highest Infection Level the player may start for an organ.
+    func unlockedInfection(_ organID: Int) -> Int { max(1, min(Organ.maxInfection, clearedInfection(organID) + 1)) }
+
+    mutating func recordClear(_ o: Organ) {
+        guard !o.isEndless else { return }
+        clearedStages.insert(o.id)
+        unlockedStage = max(unlockedStage, min(5, o.id + 1))
+        infectionCleared[String(o.id)] = max(clearedInfection(o.id), o.infection)
     }
 
     var endlessUnlocked: Bool { clearedStages.contains(2) }
@@ -91,6 +123,8 @@ extension SaveData {
         seenIntro = try c.decodeIfPresent(Bool.self, forKey: .seenIntro) ?? d.seenIntro
         ownedSkins = try c.decodeIfPresent(Set<String>.self, forKey: .ownedSkins) ?? d.ownedSkins
         skinID = try c.decodeIfPresent(String.self, forKey: .skinID) ?? d.skinID
+        ranks = try c.decodeIfPresent([String: Int].self, forKey: .ranks) ?? d.ranks
+        infectionCleared = try c.decodeIfPresent([String: Int].self, forKey: .infectionCleared) ?? d.infectionCleared
     }
 }
 
@@ -111,14 +145,14 @@ struct PlayerStats: Equatable {
     static func make(save: SaveData, loadout: Loadout) -> PlayerStats {
         let p = loadout.passives
         return PlayerStats(
-            maxHP: 100 + Double(save.level(.health) * 10) + Double((p[.maxHP] ?? 0) * 20),
-            speed: PlayerStats.baseSpeed * (1 + 0.03 * Double(save.level(.speed)) + 0.08 * Double(p[.speed] ?? 0)),
-            magnet: 120 * (1 + 0.08 * Double(save.level(.magnet)) + 0.30 * Double(p[.magnet] ?? 0)),
-            damage: 1 + 0.05 * Double(save.level(.power)) + 0.10 * Double(p[.power] ?? 0),
+            maxHP: 100 + save.power(.health) * 10 + Double((p[.maxHP] ?? 0) * 20),
+            speed: PlayerStats.baseSpeed * (1 + 0.03 * save.power(.speed) + 0.08 * Double(p[.speed] ?? 0)),
+            magnet: 120 * (1 + 0.08 * save.power(.magnet) + 0.30 * Double(p[.magnet] ?? 0)),
+            damage: 1 + 0.05 * save.power(.power) + 0.10 * Double(p[.power] ?? 0),
             cooldown: max(0.5, 1 - 0.08 * Double(p[.rapid] ?? 0)),
-            armor: min(0.5, 0.03 * Double(save.level(.armor))),
+            armor: min(0.5, 0.03 * save.power(.armor)),
             regen: 0.6 * Double(p[.regen] ?? 0),
-            coinBonus: 1 + 0.08 * Double(save.level(.greed))
+            coinBonus: 1 + 0.08 * save.power(.greed)
         )
     }
 }

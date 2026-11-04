@@ -56,7 +56,7 @@ struct RootView: View {
             case .map: MapView().transition(.move(edge: .trailing))
             case .lab: LabView().transition(.move(edge: .trailing))
             case .skins: SkinsView().transition(.move(edge: .trailing))
-            case .game(let organ): GameView(organ: organ).transition(.opacity).id(organ.id)
+            case .game(let organ): GameView(organ: organ).transition(.opacity).id("\(organ.id)-\(organ.infection)")
             }
         }
         .onAppear {

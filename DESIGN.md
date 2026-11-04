@@ -55,9 +55,15 @@ Elites (every minute): bigger, glowing ring, drop a chest (free upgrade).
 6. **Endless** (unlocked after stage 2) — survive as long as possible, leaderboard-style best time.
 Difficulty scales with stage number.
 
+### Infection Levels (replay)
+Clearing an organ opens its next Infection Level, up to 10 (picker on the Body Map card; "Infection Level N" button on the win screen).
+Each level above 1: enemy health/damage +40% (of the stage value), speed +3%, spawn rate +7%, elites every 60 s → 30 s min (−3 s/level),
+clear reward +60%, run coins +15%. The map dot shows the highest level cleared. Endless is unaffected.
+
 ## Meta — Tech Lab (Bio-Coins)
 Permanent upgrades: Power, Armor (−dmg), Max HP, Speed, Magnet, Coin bonus, Revive (one free).
-Each 10 levels, rising cost.
+Each 10 levels, rising cost. After MAX, **Mutation Ranks** (up to 50 per tech, not Revive): each rank is worth 0.4 of a level
+(Speed 0.2), costing 2000 + 400 per rank, so coins always have a use. Armor stays capped at 50%.
 
 ## Nano skins
 Classic (free), Neon 250, Toxic 600, Stealth 1200 Bio-Coins; Golden for clearing the Stomach.

@@ -139,6 +139,7 @@ final class GameScene: SKScene {
         if rookie { stats.damage *= Rookie.damageBoost }
         self.stats = stats
         self.nextBoss = state.organ.bossTime
+        self.nextElite = state.organ.eliteInterval
         super.init(size: size)
         hp = stats.maxHP
         scaleMode = .resizeFill
@@ -300,7 +301,7 @@ final class GameScene: SKScene {
             if spawnAcc > 3 { spawnAcc = 3 }
         }
         if time >= nextElite && !bossDefeated {
-            nextElite += 60
+            nextElite += state.organ.eliteInterval
             spawn(.elite)
         }
         if time >= nextBoss && boss == nil && !bossDefeated {
@@ -330,7 +331,7 @@ final class GameScene: SKScene {
         node.size = CGSize(width: s, height: s)
         node.position = p
         enemyLayer.addChild(node)
-        let speedJitter = kind.isBoss ? 1 : Double.random(in: 0.9...1.12)
+        let speedJitter = (kind.isBoss ? 1 : Double.random(in: 0.9...1.12)) * state.organ.speedScale
         let e = Enemy(kind: kind, node: node, pos: p, hp: b.hp * hpScale, speed: b.speed * speedJitter, radius: b.radius,
                       damage: b.damage * (0.85 + 0.15 * diff), xp: b.xp)
         e.timerA = Double.random(in: 1.5...3)
@@ -994,7 +995,8 @@ final class GameScene: SKScene {
     /// Debug/UI-test helper: start the run later in the timeline (e.g. right before the boss).
     func fastForward(to t: Double) {
         time = t
-        nextElite = (floor(t / 60) + 1) * 60
+        let iv = state.organ.eliteInterval
+        nextElite = (floor(t / iv) + 1) * iv
     }
 
     /// Called by the HUD when the player gives up after dying.

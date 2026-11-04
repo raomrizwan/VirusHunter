@@ -71,6 +71,11 @@ extension SaveData {
         if let t = open.min(by: { $0.cost(toLevel: level($0) + 1) < $1.cost(toLevel: level($1) + 1) }) {
             return ("\(t.title) Lv \(level(t) + 1)", nil, t.symbol, t.cost(toLevel: level(t) + 1))
         }
+        // Everything MAX: point at the cheapest Mutation Rank.
+        let ranked = TechKind.allCases.filter { rank($0) < $0.maxRank }
+        if let t = ranked.min(by: { $0.rankCost(toRank: rank($0) + 1) < $1.rankCost(toRank: rank($1) + 1) }) {
+            return ("\(t.title) Rank \(rank(t) + 1)", nil, t.symbol, t.rankCost(toRank: rank(t) + 1))
+        }
         return nil
     }
 }
