@@ -196,7 +196,7 @@ struct MapView: View {
         let cleared = model.save.clearedInfection(o.id) >= o.infection
         let bossSetup = o.bossSetup(country: model.save.country.id)
         return HStack(spacing: 14) {
-            Image(bossSetup.kind.texture).resizable().frame(width: 84, height: 84).shadow(color: Theme.magenta.opacity(0.5), radius: 10)
+            Image(bossSetup.texture).resizable().frame(width: 84, height: 84).shadow(color: Theme.magenta.opacity(0.5), radius: 10)
             VStack(alignment: .leading, spacing: 4) {
                 Text(o.infection == 1 ? Story.chapter(o.id).uppercased() : "MUTATED STRAIN · LEVEL \(o.infection)")
                     .font(Theme.body(11, .heavy)).foregroundStyle(o.infection == 1 ? Theme.cyan : Theme.magenta).tracking(1.5)

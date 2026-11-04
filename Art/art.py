@@ -254,6 +254,96 @@ def boss(kind, size=512):
     return f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {size} {size}" width="{size}" height="{size}">{inner}{extra}</svg>'
 
 
+# ---------------------------------------------------------------- boss variants (city 2+)
+BOSS_BASE = {"sumo": "blob", "cowboy": "spiky", "royal": "elite", "brain": "brainv", "marrow": "bone"}
+BASE_PAL = {"blob": ("#E3A0FF", "#A24BEB", "#4E1883"), "spiky": ("#B7FF5C", "#4CC21E", "#1F6B10"),
+            "elite": ("#8AF2FF", "#14B8E6", "#0A4F7A"), "brainv": ("#FFC9E6", "#FF6FB5", "#8A1D55"),
+            "bone": ("#FFFFFF", "#E6DCC4", "#7A6E55")}
+VARIANT_PAL = {
+    "frost": ("#F0FDFF", "#7FD8FF", "#1E5F96"),
+    "toxic": ("#E2FF8A", "#7BE02B", "#2C640A"),
+    "inferno": ("#FFE08A", "#FF6A1F", "#8A1A00"),
+    "shadow": ("#A898D8", "#4A2E7A", "#140826"),
+    "mega": ("#FFB4B4", "#E0303A", "#5E0A12"),
+}
+BOSS_VARIANTS = ["frost", "toxic", "inferno", "shadow", "mega"]
+
+
+def boss_variant(kind, variant, size=512):
+    """A boss in a city variant: its own colors plus the variant's look (ice, slime, fire, smoke, armor)."""
+    svg = boss(kind, size)
+    for old, new in zip(BASE_PAL[BOSS_BASE[kind]], VARIANT_PAL[variant]):
+        svg = svg.replace(old, new)
+    light, mid, dark = VARIANT_PAL[variant]
+    c = size / 2
+    rnd = random.Random(hash((kind, variant)) % 1000)
+    back, front, defs = [], [], ""
+    if variant == "frost":
+        # ice crystals fanning out behind, icicles below, sparkles
+        for i in range(9):
+            a = -math.pi / 2 + (i - 4) * 0.36
+            L = 215 + rnd.uniform(-10, 25)
+            x, y = c + math.cos(a) * L, c + math.sin(a) * L
+            pa, pb = a - 0.09, a + 0.09
+            back.append(f'<path d="M{c+math.cos(pa)*120} {c+math.sin(pa)*120} L{x} {y} L{c+math.cos(pb)*120} {c+math.sin(pb)*120} Z" fill="#DDF7FF" stroke="#4FB4E8" stroke-width="5" opacity=".95"/>')
+        for i in range(7):
+            x = c - 120 + i * 40; L = 40 + rnd.uniform(0, 35)
+            front.append(f'<path d="M{x-12} {c+128} L{x} {c+128+L} L{x+12} {c+128} Z" fill="#E8FBFF" stroke="#4FB4E8" stroke-width="4"/>')
+        for (x, y) in [(c-170, c-40), (c+175, c+10), (c-140, c+150), (c+150, c-150)]:
+            front.append(f'<path d="M{x} {y-18} L{x} {y+18} M{x-18} {y} L{x+18} {y} M{x-12} {y-12} L{x+12} {y+12} M{x+12} {y-12} L{x-12} {y+12}" stroke="#FFFFFF" stroke-width="5" stroke-linecap="round"/>')
+    elif variant == "toxic":
+        # slime drips, bubbles and a gas cloud
+        back.append(f'<ellipse cx="{c}" cy="{c+40}" rx="235" ry="215" fill="#9CFF3A" opacity=".18"/>')
+        for i in range(6):
+            x = c - 110 + i * 44; L = 35 + rnd.uniform(0, 45)
+            front.append(f'<path d="M{x-14} {c+105} Q{x-14} {c+105+L} {x} {c+115+L} Q{x+14} {c+105+L} {x+14} {c+105} Z" fill="#7BE02B" stroke="#2C640A" stroke-width="4"/>')
+            front.append(f'<circle cx="{x}" cy="{c+130+L}" r="9" fill="#9CFF3A" stroke="#2C640A" stroke-width="3"/>')
+        for _ in range(7):
+            x, y, rr = c + rnd.uniform(-200, 200), c + rnd.uniform(-210, -60), rnd.uniform(8, 18)
+            front.append(f'<circle cx="{x}" cy="{y}" r="{rr}" fill="#C8FF6A" opacity=".75" stroke="#2C640A" stroke-width="3"/>')
+    elif variant == "inferno":
+        # a crown of flames behind and embers around
+        defs = '<radialGradient id="fl" cx="50%" cy="80%" r="80%"><stop offset="0" stop-color="#FFF4A0"/><stop offset=".5" stop-color="#FF9A1F"/><stop offset="1" stop-color="#E02A0A"/></radialGradient>'
+        for i in range(11):
+            a = -math.pi / 2 + (i - 5) * 0.3
+            L = 230 + rnd.uniform(-20, 30)
+            x, y = c + math.cos(a) * L, c + math.sin(a) * L
+            bx1, by1 = c + math.cos(a - 0.22) * 110, c + math.sin(a - 0.22) * 110
+            bx2, by2 = c + math.cos(a + 0.22) * 110, c + math.sin(a + 0.22) * 110
+            back.append(f'<path d="M{bx1} {by1} Q{x-30} {(by1+y)/2} {x} {y} Q{x+30} {(by2+y)/2} {bx2} {by2} Z" fill="url(#fl)" opacity=".95"/>')
+        for _ in range(9):
+            x, y = c + rnd.uniform(-220, 220), c + rnd.uniform(-230, 220)
+            front.append(f'<circle cx="{x}" cy="{y}" r="{rnd.uniform(4, 9)}" fill="#FFD25C"/>')
+    elif variant == "shadow":
+        # smoke wisps behind, glowing red eyes, a dark veil
+        for i in range(8):
+            a = 2 * math.pi * i / 8 + 0.3
+            x, y = c + math.cos(a) * 175, c + math.sin(a) * 175
+            back.append(f'<circle cx="{x}" cy="{y}" r="{70 + rnd.uniform(-10, 20)}" fill="#2A1A48" opacity=".55"/>')
+        back.append(f'<path d="M{c-200} {c+200} Q{c-230} {c+260} {c-150} {c+250} Q{c-80} {c+290} {c} {c+250} Q{c+80} {c+290} {c+150} {c+250} Q{c+230} {c+260} {c+200} {c+200}" fill="#1E1036" opacity=".7"/>')
+        r = size * (0.34 if BOSS_BASE[kind] == "blob" else 0.30)
+        ey, ex, er = c - r * 0.08, r * 0.36, r * 0.2
+        for sx in (-1, 1):
+            front.append(f'<circle cx="{c+sx*ex}" cy="{ey+er*0.2}" r="{er*0.9}" fill="#FF2A4A" opacity=".55"/>')
+            front.append(f'<circle cx="{c+sx*ex}" cy="{ey+er*0.2}" r="{er*0.45}" fill="#FFE0E6"/>')
+    elif variant == "mega":
+        # armor: shoulder plates, a spiked collar and bolts
+        for sx in (-1, 1):
+            x = c + sx * 170
+            front.append(f'<path d="M{x-sx*40} {c-40} Q{x+sx*60} {c-60} {x+sx*55} {c+40} Q{x+sx*10} {c+60} {x-sx*40} {c+30} Z" fill="#9AA4B8" stroke="#3A4256" stroke-width="8"/>')
+            for k in range(3):
+                front.append(f'<path d="M{x+sx*(5+k*18)} {c-48+k*4} L{x+sx*(18+k*22)} {c-95+k*6} L{x+sx*(28+k*18)} {c-44+k*4} Z" fill="#D8DEEA" stroke="#3A4256" stroke-width="5"/>')
+            front.append(f'<circle cx="{x}" cy="{c}" r="8" fill="#3A4256"/>')
+        front.append(f'<path d="M{c-110} {c+140} Q{c} {c+185} {c+110} {c+140} L{c+100} {c+170} Q{c} {c+215} {c-100} {c+170} Z" fill="#9AA4B8" stroke="#3A4256" stroke-width="7"/>')
+        for k in range(5):
+            x = c - 80 + k * 40
+            front.append(f'<path d="M{x-10} {c+175+abs(k-2)*-6} L{x} {c+205} L{x+10} {c+175+abs(k-2)*-6} Z" fill="#D8DEEA" stroke="#3A4256" stroke-width="4"/>')
+    head, rest = svg.split("<defs>", 1)
+    d, body = rest.split("</defs>", 1)
+    body = body.replace("</svg>", "")
+    return f'{head}<defs>{d}{defs}</defs>{"".join(back)}{body}{"".join(front)}</svg>'
+
+
 # ---------------------------------------------------------------- pickups / fx
 def orb(size=96, color="#3FE6FF", core="#E8FFFF"):
     defs = f'''<radialGradient id="o" cx="40%" cy="35%" r="70%"><stop offset="0" stop-color="{core}"/><stop offset=".6" stop-color="{color}"/><stop offset="1" stop-color="{color}" stop-opacity=".2"/></radialGradient>
@@ -483,6 +573,8 @@ if __name__ == "__main__":
         items.append((f"virus-{k}", virus(k, 256, seed=hash(k) % 100)))
     for k in ["sumo", "cowboy", "royal", "brain", "marrow"]:
         items.append((f"boss-{k}", boss(k)))
+        for v in BOSS_VARIANTS:
+            items.append((f"boss-{k}-{v}", boss_variant(k, v)))
     items += [("orb", orb()), ("orb-big", orb(96, "#FFE45C", "#FFFFE0")), ("coin", coin()), ("heart", heart()), ("chest", chest()),
               ("glow", glow()), ("glow-pink", glow(128, "#FF6BD5")), ("glow-gold", glow(128, "#FFE45C")), ("bolt", bolt()), ("bomb", bomb()), ("slime", slime())]
     for o in ORGANS:

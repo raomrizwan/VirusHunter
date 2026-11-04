@@ -300,6 +300,7 @@ final class CoreTests: XCTestCase {
                 XCTAssertEqual(Set(setups.map(\.variant)).count, 5, "\(country) city \(lv) variants")
                 XCTAssertFalse(setups.contains { $0.variant == .normal })
                 XCTAssertTrue(setups.allSatisfy { $0.title.hasPrefix($0.variant.prefix + " ") })
+                XCTAssertTrue(setups.allSatisfy { $0.texture == "\($0.kind.texture)-\($0.variant.rawValue)" })
                 lineups.insert(setups.map(\.kind))
             }
             XCTAssertGreaterThan(lineups.count, 3, "\(country) cities should not all repeat one lineup")

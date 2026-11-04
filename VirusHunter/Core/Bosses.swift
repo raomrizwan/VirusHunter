@@ -37,7 +37,7 @@ enum BossVariant: String, CaseIterable {
     var hpScale: Double { self == .mega ? 1.5 : self == .shadow ? 0.9 : 1 }
     var sizeScale: Double { self == .mega ? 1.25 : 1 }
     var speedScale: Double { self == .shadow ? 1.25 : self == .mega ? 0.9 : 1 }
-    /// Body tint as RGB plus blend amount (nil = original colors).
+    /// Signature color (shots, effects) as RGB plus a body blend amount (nil = original colors).
     var tint: (r: Double, g: Double, b: Double, amount: Double)? {
         switch self {
         case .normal: return nil
@@ -56,6 +56,8 @@ struct BossSetup: Equatable {
     let kind: EnemyKind
     let variant: BossVariant
     var title: String { variant == .normal ? kind.bossTitle : "\(variant.prefix) \(kind.bossTitle)" }
+    /// Each variant boss has its own art ("boss-sumo-frost").
+    var texture: String { variant == .normal ? kind.texture : "\(kind.texture)-\(variant.rawValue)" }
 }
 
 private func citySeed(_ country: String, _ level: Int, salt: UInt64) -> SeededRNG {

@@ -426,8 +426,10 @@ final class GameScene: SKScene {
         let p = bossNear ? CGPoint(x: ppos.x, y: ppos.y + 175) : CGPoint(x: ppos.x + cos(a) * 320, y: ppos.y + sin(a) * 320)
         let e = spawn(kind, at: p, hpMul: v.hpScale, sizeMul: v.sizeScale)
         e.variant = v; e.title = setup.title; e.speed *= v.speedScale
+        e.node.texture = tex(setup.texture)
         if let t = v.tint {
-            e.baseTint = UIColor(red: t.r, green: t.g, blue: t.b, alpha: 1); e.baseBlend = CGFloat(t.amount)
+            // The variant art already has its colors; the tint colors its shots and returns after hit flashes.
+            e.baseTint = UIColor(red: t.r, green: t.g, blue: t.b, alpha: 1); e.baseBlend = 0
             restoreTint(e)
         }
         e.node.run(.repeatForever(.sequence([.scale(to: 1.04, duration: 0.6), .scale(to: 0.97, duration: 0.6)])))
