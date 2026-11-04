@@ -82,3 +82,42 @@ extension SaveData {
         return Organ.all.first { clearedInfection($0.id) < level && canPlay($0.id, level: level) }?.at(infection: level)
     }
 }
+
+// MARK: - City rewards
+
+/// What saving each city unlocks: new weapons and skins, kept secret until earned.
+enum CityReward: Equatable {
+    case weapon(WeaponKind)
+    case skin(Skin)
+    case coins(Int)
+
+    static func forCity(_ level: Int) -> CityReward {
+        switch level {
+        case 2: return .weapon(.freeze)
+        case 3: return .skin(.frost)
+        case 4: return .weapon(.missile)
+        case 5: return .skin(.plasma)
+        case Organ.maxInfection: return .skin(.royal)
+        default: return .coins(1_000 + 250 * level)
+        }
+    }
+
+    var title: String {
+        switch self {
+        case .weapon(let w): return "New weapon: \(w.title)"
+        case .skin(let s): return "New skin: \(s.title)"
+        case .coins(let n): return "City reward: \(n.formatted()) coins"
+        }
+    }
+}
+
+extension SaveData {
+    /// City-reward weapons not earned yet.
+    var lockedWeapons: Set<WeaponKind> {
+        var out = WeaponKind.cityRewards
+        for c in stride(from: 1, through: citiesCleared, by: 1) {
+            if case .weapon(let w) = CityReward.forCity(c) { out.remove(w) }
+        }
+        return out
+    }
+}

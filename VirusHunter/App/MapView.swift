@@ -152,6 +152,14 @@ struct MapView: View {
             }
             Text("\(done)/\(Organ.all.count) organs clean").font(Theme.body(12, .bold)).foregroundStyle(Theme.muted)
         }
+        if city >= 2 || infected == 0 {
+            HStack(spacing: 6) {
+                Image(systemName: "gift.fill").font(.system(size: 12, weight: .bold)).foregroundStyle(Theme.gold)
+                Text(infected == 0 ? CityReward.forCity(city).title : "Save this city for a mystery reward")
+                    .font(Theme.body(11, .bold)).foregroundStyle(Theme.gold)
+                Spacer(minLength: 0)
+            }
+        }
         }
         .padding(.horizontal, 14).padding(.vertical, 9).glass(14)
         .accessibilityIdentifier("cityStatus")

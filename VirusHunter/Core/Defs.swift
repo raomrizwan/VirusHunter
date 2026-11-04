@@ -3,8 +3,10 @@ import Foundation
 // MARK: - Weapons & passives
 
 enum WeaponKind: String, CaseIterable, Codable, Identifiable {
-    case laser, swarm, shield, field, zap, bomb
+    case laser, swarm, shield, field, zap, bomb, freeze, missile
     var id: String { rawValue }
+    /// Weapons earned by saving cities (locked until then).
+    static let cityRewards: Set<WeaponKind> = [.freeze, .missile]
     var title: String {
         switch self {
         case .laser: return "Pulse Laser"
@@ -13,6 +15,8 @@ enum WeaponKind: String, CaseIterable, Codable, Identifiable {
         case .field: return "Shock Field"
         case .zap: return "Chain Zap"
         case .bomb: return "Cure Bomb"
+        case .freeze: return "Freeze Ray"
+        case .missile: return "Homing Missiles"
         }
     }
     var symbol: String {
@@ -23,6 +27,8 @@ enum WeaponKind: String, CaseIterable, Codable, Identifiable {
         case .field: return "dot.radiowaves.left.and.right"
         case .zap: return "bolt.fill"
         case .bomb: return "cross.circle.fill"
+        case .freeze: return "snowflake"
+        case .missile: return "location.north.fill"
         }
     }
     /// Evolved form, reached at level `evolvedLevel` once the weapon is maxed and its partner passive is owned.
@@ -34,6 +40,8 @@ enum WeaponKind: String, CaseIterable, Codable, Identifiable {
         case .field: return "Storm Field"
         case .zap: return "Thunderstorm"
         case .bomb: return "Cure Nova"
+        case .freeze: return "Absolute Zero"
+        case .missile: return "Rocket Storm"
         }
     }
     /// The passive that unlocks this weapon's evolution.
@@ -45,6 +53,8 @@ enum WeaponKind: String, CaseIterable, Codable, Identifiable {
         case .field: return .magnet
         case .zap: return .speed
         case .bomb: return .regen
+        case .freeze: return .magnet
+        case .missile: return .power
         }
     }
     func displayTitle(level l: Int) -> String { l >= evolvedLevel ? evolvedTitle : title }
@@ -59,6 +69,8 @@ enum WeaponKind: String, CaseIterable, Codable, Identifiable {
             case .field: return "EVOLVE: a huge storm aura that shreds viruses."
             case .zap: return "EVOLVE: lightning jumps 11 times, twice as often."
             case .bomb: return "EVOLVE: giant cure blasts every second."
+            case .freeze: return "EVOLVE: a huge frost wave that nearly stops viruses."
+            case .missile: return "EVOLVE: six heavy rockets with big blasts."
             }
         }
         switch self {
@@ -68,6 +80,8 @@ enum WeaponKind: String, CaseIterable, Codable, Identifiable {
         case .field: return l == 1 ? "An electric aura zaps anything close." : "Bigger aura, +damage."
         case .zap: return l == 1 ? "Lightning jumps between viruses." : "+2 jumps, +damage."
         case .bomb: return l == 1 ? "Drops cure bombs as you fly." : "Bigger blast, faster drops."
+        case .freeze: return l == 1 ? "A frost wave slows and chills nearby viruses." : "Bigger, colder, more often."
+        case .missile: return l == 1 ? "Fires a missile that chases viruses and explodes." : "+missiles, +damage."
         }
     }
 }
@@ -133,6 +147,8 @@ struct Loadout: Equatable {
     var weapons: [WeaponKind: Int] = [.laser: 1]
     var weaponOrder: [WeaponKind] = [.laser]
     var passives: [PassiveKind: Int] = [:]
+    /// Weapons not available yet (city rewards not earned).
+    var locked: Set<WeaponKind> = WeaponKind.cityRewards
 
     func level(_ w: WeaponKind) -> Int { weapons[w] ?? 0 }
     func level(_ p: PassiveKind) -> Int { passives[p] ?? 0 }
@@ -154,7 +170,7 @@ struct Loadout: Equatable {
             let l = level(w)
             if l > 0, l < maxLevel { out.append(.weapon(w, toLevel: l + 1)) }
             if l == maxLevel, level(w.partner) > 0 { out.append(.weapon(w, toLevel: evolvedLevel)) }
-            if l == 0, weapons.count < maxWeapons { out.append(.weapon(w, toLevel: 1)) }
+            if l == 0, weapons.count < maxWeapons, !locked.contains(w) { out.append(.weapon(w, toLevel: 1)) }
         }
         for p in PassiveKind.allCases where level(p) < maxLevel { out.append(.passive(p, toLevel: level(p) + 1)) }
         return out

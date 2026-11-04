@@ -90,6 +90,7 @@ struct GameContent: View {
         s.runs += 1
         s.totalKills += r.kills
         if won { s.recordClear(organ) }
+        if s.citiesCleared > before.citiesCleared, case .coins(let n) = CityReward.forCity(s.citiesCleared) { s.coins += n }
         let scene = won ? Story.afterWin(organ, before: model.save, after: s) : nil
         if organ.isEndless { s.bestEndless = max(s.bestEndless, r.time) }
         s.goldenCaught += r.golden
@@ -116,6 +117,7 @@ struct GameContent: View {
         }
         if after.citiesCleared > before.citiesCleared {
             out.append("\(after.country.city(after.citiesCleared)) saved!")
+            out.append("🎁 " + CityReward.forCity(after.citiesCleared).title)
             if after.citiesCleared < Organ.maxInfection { out.append("Outbreak in \(after.country.city(after.currentCity)) unlocked") }
         }
         for k in Skin.allCases where after.owns(k) && !before.owns(k) { out.append("\(k.title) unlocked") }

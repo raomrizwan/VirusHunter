@@ -93,6 +93,15 @@ SKINS = {
     "gold": {"#FFFFFF": "#FFF8D6", "#E7EEF7": "#FFD34D", "#9FB0C8": "#B07A06", "#8FA2BD": "#8A5E05", "#C8D4E4": "#FFE48A",
              "#3FE6FF": "#FFE45C", "#2DD4FF": "#FFC21F", "#2D8CFF": "#FF9A1F",
              "#9FD9F0": "#FFD34D", "#5FB6D8": "#B07A06"},
+    "frost": {"#FFFFFF": "#F2FBFF", "#E7EEF7": "#BFE9FF", "#9FB0C8": "#5AA6D6", "#8FA2BD": "#3A7FB0", "#C8D4E4": "#DDF4FF",
+              "#3FE6FF": "#E8FDFF", "#2DD4FF": "#9EEBFF", "#C9FFFF": "#FFFFFF", "#0AA8D8": "#4FB8E8", "#7CF6FF": "#D6FAFF", "#2D8CFF": "#7FD4FF",
+              "#FF4D6D": "#5AA6D6", "#9FD9F0": "#BFE9FF", "#5FB6D8": "#3A7FB0", "#5FF2FF": "#D6FAFF"},
+    "plasma": {"#FFFFFF": "#F3E6FF", "#E7EEF7": "#B57BFF", "#9FB0C8": "#5B21B6", "#8FA2BD": "#3B0F80", "#C8D4E4": "#D2B0FF",
+               "#3FE6FF": "#FF8A3D", "#2DD4FF": "#FF7A1F", "#C9FFFF": "#FFE2C2", "#0AA8D8": "#D9480F", "#7CF6FF": "#FFB27A", "#2D8CFF": "#FF5F1F",
+               "#FF4D6D": "#FFB020", "#9FD9F0": "#B57BFF", "#5FB6D8": "#3B0F80", "#5FF2FF": "#FFB27A"},
+    "royal": {"#FFFFFF": "#FFF4F4", "#E7EEF7": "#E0213F", "#9FB0C8": "#7A0A1E", "#8FA2BD": "#4A0512", "#C8D4E4": "#FF8A9C",
+              "#3FE6FF": "#FFD34D", "#2DD4FF": "#FFC21F", "#C9FFFF": "#FFF6C2", "#0AA8D8": "#C98A00", "#7CF6FF": "#FFE48A", "#2D8CFF": "#FF9A1F",
+              "#FF4D6D": "#FFD34D", "#9FD9F0": "#E0213F", "#5FB6D8": "#7A0A1E", "#5FF2FF": "#FFE48A"},
 }
 
 

@@ -198,6 +198,14 @@ enum WeaponStats {
         let i = max(0, min(evolvedLevel - 1, l - 1))
         return ([1.6, 1.45, 1.3, 1.15, 1.0, 0.6][i], [3, 4, 5, 6, 7, 11][i], [16, 19, 23, 28, 34, 46][i])
     }
+    static func freeze(_ l: Int) -> (cooldown: Double, radius: Double, damage: Double, slow: Double) {
+        let i = max(0, min(evolvedLevel - 1, l - 1))
+        return ([3.0, 2.7, 2.4, 2.1, 1.8, 1.2][i], [110, 125, 140, 155, 170, 230][i], [6, 8, 10, 13, 16, 26][i], [0.45, 0.5, 0.5, 0.55, 0.6, 0.75][i])
+    }
+    static func missile(_ l: Int) -> (cooldown: Double, count: Int, damage: Double, blast: Double) {
+        let i = max(0, min(evolvedLevel - 1, l - 1))
+        return ([1.6, 1.45, 1.3, 1.15, 1.0, 0.7][i], [1, 2, 2, 3, 4, 6][i], [20, 24, 29, 35, 42, 58][i], [50, 55, 60, 65, 70, 95][i])
+    }
     static func bomb(_ l: Int) -> (cooldown: Double, radius: Double, damage: Double) {
         let i = max(0, min(evolvedLevel - 1, l - 1))
         return ([2.2, 2.0, 1.8, 1.6, 1.4, 1.0][i], [80, 88, 98, 108, 120, 155][i], [30, 38, 48, 58, 70, 100][i])

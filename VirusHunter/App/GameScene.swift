@@ -23,6 +23,8 @@ final class Enemy {
     var spin: Double = 0       // rotating aim for spiral attacks
     var phase = 0              // boss phase (King Vex enrages at half health)
     var golden = false         // Golden Virus event: flees, drops lots of coins
+    var slowT: Double = 0      // Freeze Ray chill
+    var slowAmt: Double = 0
     var shieldHitCD: Double = 0
     var fieldHitCD: Double = 0
     var alive = true
@@ -37,7 +39,9 @@ final class Enemy {
     }
 }
 
-private struct Bolt { var pos: CGPoint; var vel: CGVector; var damage: Double; var pierce: Int; var life: Double; let node: SKSpriteNode; var hit: Set<ObjectIdentifier> = [] }
+private struct Bolt { var pos: CGPoint; var vel: CGVector; var damage: Double; var pierce: Int; var life: Double; let node: SKSpriteNode; var hit: Set<ObjectIdentifier> = []
+    var blast: Double = 0      // > 0: homing missile that explodes on hit
+}
 private struct Shot { var pos: CGPoint; var vel: CGVector; var damage: Double; var life: Double; let node: SKSpriteNode }
 private struct Bomb { var pos: CGPoint; var fuse: Double; let node: SKSpriteNode }
 private struct Puddle { var pos: CGPoint; var life: Double; var armed: Double; let node: SKShapeNode }
@@ -116,7 +120,7 @@ final class GameScene: SKScene {
     private var pendingLevels = 0
     private var kills = 0
     private var coinsCollected = 0
-    private var laserT = 0.0, zapT = 0.0, bombT = 0.0, fieldT = 0.0
+    private var laserT = 0.0, zapT = 0.0, bombT = 0.0, fieldT = 0.0, freezeT = 0.0, missileT = 0.0
     private var nextElite: Double = 60
     private var nextBoss: Double
     private var bossCount = 0
@@ -222,6 +226,7 @@ final class GameScene: SKScene {
         joyBase.fillColor = UIColor(white: 1, alpha: 0.06)
         joyKnob.fillColor = UIColor(red: 0.45, green: 0.95, blue: 1, alpha: 0.45)
 
+        state.loadout.locked = save.lockedWeapons
         state.onChoose = { [weak self] o in self?.choose(o) }
         state.onResume = { [weak self] in self?.simPaused = false; self?.state.phase = .playing }
         state.onRevive = { [weak self] in self?.revive() }
@@ -480,6 +485,12 @@ final class GameScene: SKScene {
             }
             if e.kind.isBoss { push = CGVector(dx: push.dx * 0.1, dy: push.dy * 0.1) }
             if rush > 0, !e.kind.isBoss { v = CGVector(dx: v.dx * 1.8, dy: v.dy * 1.8) }
+            if e.slowT > 0 {
+                e.slowT -= dt
+                let k = 1 - e.slowAmt * (e.kind.isBoss ? 0.5 : 1)
+                v = CGVector(dx: v.dx * k, dy: v.dy * k)
+                if e.slowT <= 0 { e.node.color = .white }
+            }
             e.pos.x += (v.dx + push.dx + e.knock.dx + wind.dx * 0.6) * dt
             e.pos.y += (v.dy + push.dy + e.knock.dy + wind.dy * 0.6) * dt
             e.knock = CGVector(dx: e.knock.dx * 0.86, dy: e.knock.dy * 0.86)
@@ -787,6 +798,46 @@ final class GameScene: SKScene {
                 } else { zapT = 0.2 }
             }
         }
+        // Freeze ray: a frost wave that chills (slows) and damages nearby viruses
+        if lo.level(.freeze) > 0 {
+            freezeT -= dt
+            if freezeT <= 0 {
+                let w = WeaponStats.freeze(lo.level(.freeze))
+                freezeT = w.cooldown * cd
+                each(near: ppos, radius: w.radius + 30) { e in
+                    if dist2(e.pos, self.ppos) < pow(w.radius + e.radius * 0.5, 2) {
+                        e.slowT = 2; e.slowAmt = w.slow
+                        e.node.color = UIColor(red: 0.55, green: 0.85, blue: 1, alpha: 1)
+                        self.damage(e, w.damage * dm, knock: .zero, kb: 0, quiet: true)
+                    }
+                }
+                let ring = SKShapeNode(circleOfRadius: CGFloat(w.radius))
+                ring.position = ppos; ring.zPosition = 3; ring.lineWidth = 5; ring.blendMode = .add
+                ring.strokeColor = UIColor(red: 0.6, green: 0.9, blue: 1, alpha: 0.9)
+                ring.fillColor = UIColor(red: 0.5, green: 0.85, blue: 1, alpha: 0.12)
+                ring.setScale(0.3)
+                world.addChild(ring)
+                ring.run(.sequence([.group([.scale(to: 1, duration: 0.25), .sequence([.wait(forDuration: 0.1), .fadeOut(withDuration: 0.3)])]), .removeFromParent()]))
+            }
+        }
+        // Homing missiles
+        if lo.level(.missile) > 0 {
+            missileT -= dt
+            if missileT <= 0 {
+                let w = WeaponStats.missile(lo.level(.missile))
+                if nearest(to: ppos, within: 450) != nil {
+                    missileT = w.cooldown * cd
+                    for i in 0..<w.count {
+                        let a = Double(i) / Double(w.count) * 2 * .pi + Double.random(in: 0...0.4)
+                        let n = SKSpriteNode(texture: tex("bolt")); n.size = CGSize(width: 26, height: 12)
+                        n.color = UIColor(red: 1, green: 0.55, blue: 0.2, alpha: 1); n.colorBlendFactor = 0.9
+                        n.position = ppos; shotLayer.addChild(n)
+                        bolts.append(Bolt(pos: ppos, vel: CGVector(dx: cos(a) * 260, dy: sin(a) * 260), damage: w.damage * dm, pierce: 0, life: 2.6, node: n, blast: w.blast))
+                    }
+                    Sound.shoot.play(volume: 0.4, minGap: 0.1)
+                } else { missileT = 0.2 }
+            }
+        }
         // Cure bomb
         if lo.level(.bomb) > 0 {
             bombT -= dt
@@ -821,6 +872,18 @@ final class GameScene: SKScene {
 
     private func moveBolts(_ dt: Double) {
         for i in bolts.indices.reversed() {
+            if bolts[i].blast > 0 {
+                // Steer toward the nearest virus and speed up.
+                if let t = nearest(to: bolts[i].pos, within: 360) {
+                    let want = norm(sub(t.pos, bolts[i].pos))
+                    let sp = min(620, len(bolts[i].vel) + 900 * dt)
+                    let cur = norm(bolts[i].vel)
+                    let k = min(1, 7 * dt)
+                    let dir = norm(CGVector(dx: cur.dx + (want.dx - cur.dx) * k, dy: cur.dy + (want.dy - cur.dy) * k))
+                    bolts[i].vel = CGVector(dx: dir.dx * sp, dy: dir.dy * sp)
+                }
+                bolts[i].node.zRotation = atan2(bolts[i].vel.dy, bolts[i].vel.dx)
+            }
             bolts[i].pos.x += bolts[i].vel.dx * dt
             bolts[i].pos.y += bolts[i].vel.dy * dt
             bolts[i].life -= dt
@@ -835,6 +898,13 @@ final class GameScene: SKScene {
                 if let e = hitE {
                     bolts[i].hit.insert(ObjectIdentifier(e))
                     damage(e, bolts[i].damage, knock: norm(bolts[i].vel), kb: 90)
+                    if bolts[i].blast > 0 {
+                        let r = bolts[i].blast, dmg = bolts[i].damage * 0.6
+                        each(near: p, radius: r + 30) { o in
+                            if o !== e, dist2(o.pos, p) < pow(r + o.radius, 2) { self.damage(o, dmg, knock: norm(sub(o.pos, p)), kb: 120, quiet: true) }
+                        }
+                        explosion(at: p, radius: r, color: UIColor(red: 1, green: 0.55, blue: 0.2, alpha: 1))
+                    }
                     if bolts[i].pierce <= 0 { dead = true } else { bolts[i].pierce -= 1 }
                 }
             }

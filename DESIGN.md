@@ -77,6 +77,11 @@ an arrival scene per city 2-10 on the map, a finale after city 10, Endless intro
 - Random events: Golden Virus (flees, 15 s, 30 coins, trophy), supply-drop chest, King Vex ambush from city 3 (survive 20 s, +40).
 - One bonus objective per run (+60): no damage 45 s, 250 kills by 3:00, boss in 45 s, open 3 chests.
 
+### City rewards (kept secret until earned)
+City 1: 1,250 coins · 2: **Freeze Ray** weapon (frost wave, slows; evolves with DNA Magnet into Absolute Zero) · 3: **Frost Nano** skin ·
+4: **Homing Missiles** weapon (steer + explode; evolves with Overcharge into Rocket Storm) · 5: **Plasma Nano** skin ·
+6-9: 2,500-3,250 coins · 10: **Royal Nano** skin. City-reward weapons stay out of level-ups until earned.
+
 ### Trophies
 14 in-game trophies with coin rewards (`Core/Trophies.swift`), screen from the Home trophy button; Game Center mirrors them
 as `vh.ach.<trophy rawValue>` and the Leaderboards button shows only when signed in.

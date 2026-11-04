@@ -265,4 +265,19 @@ final class CoreTests: XCTestCase {
         XCTAssertNil(s.claimTrophy(.kills10k))
         XCTAssertEqual(s.unclaimedTrophies, 0)
     }
+
+    func testCityRewardsUnlockWeaponsAndSkins() {
+        var s = SaveData(); s.unlockedStage = 5
+        XCTAssertEqual(s.lockedWeapons, [.freeze, .missile])
+        XCTAssertFalse(Loadout().candidates().contains(.weapon(.freeze, toLevel: 1)))
+        for lv in 1...2 { for o in Organ.all { s.recordClear(o.at(infection: lv)) } }
+        XCTAssertEqual(s.citiesCleared, 2)
+        XCTAssertEqual(s.lockedWeapons, [.missile])
+        var l = Loadout(); l.locked = s.lockedWeapons
+        XCTAssertTrue(l.candidates().contains(.weapon(.freeze, toLevel: 1)))
+        XCTAssertFalse(s.owns(.frost))
+        for o in Organ.all { s.recordClear(o.at(infection: 3)) }
+        XCTAssertTrue(s.owns(.frost))
+        XCTAssertGreaterThan(WeaponStats.missile(evolvedLevel).damage, WeaponStats.missile(1).damage)
+    }
 }
