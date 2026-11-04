@@ -256,10 +256,56 @@ struct LabView: View {
                 Text("Permanent upgrades for Nano. After MAX, keep going with Mutation Ranks.")
                     .font(Theme.body(14, .medium)).foregroundStyle(Theme.muted).multilineTextAlignment(.center).padding(.horizontal, 30)
                 ScrollView {
-                    VStack(spacing: 10) { ForEach(TechKind.allCases) { row($0) } }.padding(.horizontal, 18).padding(.bottom, 30)
+                    VStack(spacing: 10) {
+                        craftHeader
+                        ForEach(Recipe.all) { craftRow($0) }
+                        Text("UPGRADES").font(Theme.body(13, .black)).foregroundStyle(Theme.muted)
+                            .frame(maxWidth: .infinity, alignment: .leading).padding(.top, 8)
+                        ForEach(TechKind.allCases) { row($0) }
+                    }
+                    .padding(.horizontal, 18).padding(.bottom, 30)
                 }
             }
         }
+    }
+
+    private var craftHeader: some View {
+        HStack {
+            Text("CRAFT LAB").font(Theme.body(13, .black)).foregroundStyle(Theme.muted)
+            Spacer()
+            Text("🧬 \(model.save.bossDNA) Boss DNA").font(Theme.body(14, .heavy)).foregroundStyle(Theme.lime)
+                .accessibilityIdentifier("dnaCount")
+        }
+    }
+
+    /// Bosses drop DNA; DNA plus coins crafts a new weapon that joins the level-up choices.
+    private func craftRow(_ r: Recipe) -> some View {
+        let done = model.save.hasCrafted(r.weapon)
+        let can = model.save.canCraft(r)
+        return HStack(spacing: 14) {
+            Image(systemName: r.weapon.symbol).font(.system(size: 24, weight: .bold)).foregroundStyle(Theme.lime)
+                .frame(width: 52, height: 52).background(RoundedRectangle(cornerRadius: 14).fill(Theme.lime.opacity(0.15)))
+            VStack(alignment: .leading, spacing: 4) {
+                Text(r.weapon.title).font(Theme.body(17, .heavy)).foregroundStyle(.white)
+                Text(r.blurb).font(Theme.body(12)).foregroundStyle(Theme.muted)
+                if !done {
+                    Text("Needs 🧬 \(r.dna) DNA + \(r.coins.formatted()) coins").font(Theme.body(11, .bold)).foregroundStyle(Theme.magenta)
+                }
+            }
+            Spacer(minLength: 0)
+            Button {
+                var ns = model.save
+                if ns.craft(r) { model.save = ns; model.persist(); Sound.levelup.play(); Haptics.success() } else { Haptics.error() }
+            } label: {
+                Text(done ? "CRAFTED" : "CRAFT").font(Theme.body(14, .heavy)).foregroundStyle(.white)
+                    .frame(width: 92, height: 42)
+                    .background(RoundedRectangle(cornerRadius: 13).fill(done ? Color.gray.opacity(0.4) : can ? Theme.lime.opacity(0.8) : Color.white.opacity(0.12)))
+            }
+            .disabled(done)
+            .buttonStyle(PressStyle())
+            .accessibilityIdentifier("craft-\(r.weapon.rawValue)")
+        }
+        .padding(14).glass(18)
     }
 
     private func row(_ t: TechKind) -> some View {

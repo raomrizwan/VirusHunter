@@ -85,6 +85,8 @@ struct SaveData: Codable, Equatable {
     var countryProgress: [String: [String: Int]] = [:]
     /// Most cities ever saved in one country (city rewards, allies and Boss Rush stay unlocked).
     var bestCities = 0
+    var bossDNA = 0                             // crafting material from bosses
+    var crafted: Set<String> = []               // weapons crafted in the Craft Lab
 
     func level(_ t: TechKind) -> Int { tech[t.rawValue] ?? 0 }
     func rank(_ t: TechKind) -> Int { ranks[t.rawValue] ?? 0 }
@@ -194,6 +196,8 @@ extension SaveData {
         // Older saves only knew clearedStages: those count as the first city of the current country.
         for id in clearedStages where (infectionCleared[String(id)] ?? 0) < 1 { infectionCleared[String(id)] = 1 }
         bestCities = try c.decodeIfPresent(Int.self, forKey: .bestCities) ?? d.bestCities
+        bossDNA = try c.decodeIfPresent(Int.self, forKey: .bossDNA) ?? d.bossDNA
+        crafted = try c.decodeIfPresent(Set<String>.self, forKey: .crafted) ?? d.crafted
         bestCities = max(bestCities, citiesCleared)
     }
 }
@@ -256,6 +260,14 @@ enum WeaponStats {
     static func missile(_ l: Int) -> (cooldown: Double, count: Int, damage: Double, blast: Double) {
         let i = max(0, min(evolvedLevel - 1, l - 1))
         return ([1.6, 1.45, 1.3, 1.15, 1.0, 0.7][i], [1, 2, 2, 3, 4, 6][i], [20, 24, 29, 35, 42, 58][i], [50, 55, 60, 65, 70, 95][i])
+    }
+    static func saw(_ l: Int) -> (blades: Int, damage: Double, radius: Double) {
+        let i = max(0, min(evolvedLevel - 1, l - 1))
+        return ([2, 2, 3, 3, 4, 6][i], [14, 18, 22, 27, 33, 48][i], [130, 135, 140, 148, 155, 185][i])
+    }
+    static func rain(_ l: Int) -> (cooldown: Double, strikes: Int, damage: Double, radius: Double) {
+        let i = max(0, min(evolvedLevel - 1, l - 1))
+        return ([2.0, 1.85, 1.7, 1.55, 1.4, 1.0][i], [3, 4, 5, 6, 7, 10][i], [22, 26, 31, 37, 44, 60][i], [48, 50, 54, 58, 62, 75][i])
     }
     static func bomb(_ l: Int) -> (cooldown: Double, radius: Double, damage: Double) {
         let i = max(0, min(evolvedLevel - 1, l - 1))

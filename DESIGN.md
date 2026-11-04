@@ -138,3 +138,14 @@ Banner on home screen only (never during play). Remove-ads later.
 - Nano: white round helmet bot, big cyan visor eyes, red cross badge, cyan thrusters (consistent with v1 mascot robot).
 - Juice: hit flash, damage numbers, orb trails, screen shake on boss, level-up burst, haptics.
 - UI: rounded bold type, glass panels, cyan/magenta accents.
+
+## Craft Lab (Boss DNA)
+
+Every boss drops Boss DNA when beaten (1 for a regular boss, 3 for a continent villain or King Vex).
+DNA is saved after the run, win or lose. In the Tech Lab, the Craft Lab section turns DNA plus coins
+into new weapons that then join the level-up choices for good:
+
+| Weapon | Cost | What it does | Evolves into |
+|---|---|---|---|
+| Plasma Saw | 5 DNA + 1,500 coins | Blades orbit Nano wider than the shield and spin the other way | Galaxy Saw (with Speed) |
+| Antibody Rain | 8 DNA + 2,500 coins | Strikes land on random viruses around Nano | Cure Monsoon (with Rapid Fire) |

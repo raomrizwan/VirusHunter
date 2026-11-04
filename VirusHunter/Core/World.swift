@@ -128,10 +128,11 @@ enum CityReward: Equatable {
 extension SaveData {
     /// City-reward weapons not earned yet.
     var lockedWeapons: Set<WeaponKind> {
-        var out = WeaponKind.cityRewards
+        var out = WeaponKind.cityRewards.union(WeaponKind.craftable)
         for c in stride(from: 1, through: bestCities, by: 1) {
             if case .weapon(let w) = CityReward.forCity(c) { out.remove(w) }
         }
+        for w in crafted { if let k = WeaponKind(rawValue: w) { out.remove(k) } }
         return out
     }
 }

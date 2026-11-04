@@ -34,6 +34,7 @@ final class Enemy {
     var cloaked = false        // Shadow boss is invisible right now
     var targetsBed = false     // Hospital Defense: heads for the patient's bed instead of Nano
     var armorT: Double = 0     // Baron Bacter's armor: takes 10% damage while > 0
+    var sawHitCD: Double = 0
     var aux: SKNode?           // extra visual (sniper aim line)
     /// Resting tint (boss variant, Golden Virus, enraged Vex); hit flashes return to it.
     var baseTint: UIColor = .white
@@ -121,6 +122,11 @@ final class GameScene: SKScene {
     private var bots: [Bot] = []
     private var shieldNodes: [SKSpriteNode] = []
     private var shieldAngle: Double = 0
+    private var sawNodes: [SKSpriteNode] = []
+    private var sawAngle: Double = 0
+    private var rainT = 1.0
+    /// Boss DNA earned this run (Craft Lab material).
+    private(set) var dnaEarned = 0
     private let fieldNode = SKShapeNode(circleOfRadius: 70)
     private var grid: [Int: [Enemy]] = [:]
     private let cell: Double = 72
@@ -680,7 +686,7 @@ final class GameScene: SKScene {
             e.pos.x += (v.dx + push.dx + e.knock.dx + wind.dx * 0.6) * dt
             e.pos.y += (v.dy + push.dy + e.knock.dy + wind.dy * 0.6) * dt
             e.knock = CGVector(dx: e.knock.dx * 0.86, dy: e.knock.dy * 0.86)
-            e.shieldHitCD -= dt; e.fieldHitCD -= dt
+            e.shieldHitCD -= dt; e.fieldHitCD -= dt; e.sawHitCD -= dt
             if e.flash > 0 {
                 e.flash -= dt
                 if e.flash > 0 { e.node.colorBlendFactor = 0.85 } else { restoreTint(e) }
@@ -1099,6 +1105,20 @@ final class GameScene: SKScene {
             n.addChild(core)
             world.addChild(n); shieldNodes.append(n)
         }
+        let blades = lo.level(.saw) > 0 ? WeaponStats.saw(lo.level(.saw)).blades : 0
+        while sawNodes.count < blades {
+            let n = SKSpriteNode(texture: tex("glow-gold")); n.size = CGSize(width: 44, height: 44); n.zPosition = 5; n.blendMode = .add
+            let path = CGMutablePath()
+            for k in 0..<16 {
+                let a = Double(k) / 16 * 2 * .pi, r: Double = k % 2 == 0 ? 17 : 9
+                let p = CGPoint(x: cos(a) * r, y: sin(a) * r)
+                if k == 0 { path.move(to: p) } else { path.addLine(to: p) }
+            }
+            path.closeSubpath()
+            let blade = SKShapeNode(path: path); blade.fillColor = UIColor(red: 1, green: 0.55, blue: 0.2, alpha: 1); blade.strokeColor = .white; blade.lineWidth = 1.5
+            n.addChild(blade)
+            world.addChild(n); sawNodes.append(n)
+        }
         fieldNode.isHidden = lo.level(.field) == 0
         if lo.level(.field) > 0 {
             let r = WeaponStats.field(lo.level(.field)).radius
@@ -1244,6 +1264,44 @@ final class GameScene: SKScene {
                     }
                     Sound.shoot.play(volume: 0.4, minGap: 0.1)
                 } else { missileT = 0.2 }
+            }
+        }
+        // Plasma saw: blades spin around Nano the other way, wider than the shield
+        if lo.level(.saw) > 0 {
+            let w = WeaponStats.saw(lo.level(.saw))
+            sawAngle -= dt * 4.2
+            for (i, n) in sawNodes.enumerated() {
+                let a = sawAngle + Double(i) / Double(sawNodes.count) * 2 * .pi
+                let p = CGPoint(x: ppos.x + cos(a) * w.radius, y: ppos.y + sin(a) * w.radius)
+                n.position = p; n.zRotation += CGFloat(dt * 14)
+                each(near: p, radius: 50) { e in
+                    if e.sawHitCD <= 0, dist2(e.pos, p) < pow(e.radius + 18, 2) {
+                        e.sawHitCD = 0.35
+                        self.damage(e, w.damage * dm, knock: norm(sub(e.pos, self.ppos)), kb: 120, quiet: true)
+                    }
+                }
+            }
+        }
+        // Antibody rain: strikes land on random viruses near Nano
+        if lo.level(.rain) > 0 {
+            rainT -= dt
+            if rainT <= 0 {
+                let w = WeaponStats.rain(lo.level(.rain))
+                rainT = w.cooldown * cd
+                var targets: [CGPoint] = []
+                each(near: ppos, radius: 420) { e in if targets.count < w.strikes * 3 { targets.append(e.pos) } }
+                for p in targets.shuffled().prefix(w.strikes) {
+                    let mark = SKShapeNode(circleOfRadius: CGFloat(w.radius)); mark.position = p; mark.zPosition = 3
+                    mark.strokeColor = UIColor(red: 0.5, green: 1, blue: 0.8, alpha: 0.8); mark.lineWidth = 3; mark.setScale(0.3)
+                    fxLayer.addChild(mark)
+                    mark.run(.sequence([.scale(to: 1, duration: 0.3), .run { [weak self] in
+                        guard let self, !self.simPaused else { return }
+                        self.each(near: p, radius: w.radius + 30) { e in
+                            if dist2(e.pos, p) < pow(w.radius + e.radius, 2) { self.damage(e, w.damage * dm, knock: norm(sub(e.pos, p)), kb: 140, quiet: true) }
+                        }
+                        self.explosion(at: p, radius: w.radius, color: UIColor(red: 0.5, green: 1, blue: 0.8, alpha: 1))
+                    }, .removeFromParent()]))
+                }
             }
         }
         // Cure bomb
@@ -1396,6 +1454,10 @@ final class GameScene: SKScene {
         }
         if mutation == .splitters, !e.kind.isBoss, e.kind != .mini, e.kind != .blob, !e.golden {
             for _ in 0..<2 { spawn(.mini, at: jitter(e.pos, 14)) }
+        }
+        if e.kind.dnaDrop > 0 {
+            dnaEarned += e.kind.dnaDrop
+            popLabel("+\(e.kind.dnaDrop) BOSS DNA", color: UIColor(red: 0.5, green: 1, blue: 0.8, alpha: 1))
         }
         if e.kind.isBoss {
             bossKills += 1

@@ -22,7 +22,7 @@ struct HomeView: View {
                         .font(Theme.title(38))
                         .foregroundStyle(LinearGradient(colors: [.white, Theme.cyan], startPoint: .top, endPoint: .bottom))
                         .shadow(color: Theme.cyan.opacity(0.7), radius: 14)
-                    Text("NANO SWARM").font(Theme.title(15)).tracking(6).foregroundStyle(Theme.magenta)
+                    Text("NANO WAR").font(Theme.title(15)).tracking(6).foregroundStyle(Theme.magenta)
                         .shadow(color: Theme.magenta.opacity(0.6), radius: 8)
                 }
                 .padding(.top, 6)

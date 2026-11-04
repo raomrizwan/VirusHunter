@@ -98,6 +98,8 @@ struct GameContent: View {
         s.discovered.formUnion(newCards)
         s.coins += newCards.count * Pedia.coinsPerCard
         s.bestCombo = max(s.bestCombo, r.combo)
+        let dna = holder.scene.dnaEarned
+        s.bossDNA += dna
         var rushLine: String?
         if organ.isBossRush, won {
             let week = BossRush.week()
@@ -117,6 +119,7 @@ struct GameContent: View {
         GameCenter.sync(s)
         unlocks = newUnlocks(before: before, after: s)
         if let rushLine { unlocks.insert(rushLine, at: 0) }
+        if dna > 0 { unlocks.append("🧬 +\(dna) Boss DNA for the Craft Lab") }
         if !newCards.isEmpty { unlocks.append("📖 \(newCards.count) new Virus-pedia card\(newCards.count == 1 ? "" : "s") (+\(newCards.count * Pedia.coinsPerCard) coins)") }
         if s.citiesCleared >= 1, before.citiesCleared == 0 { unlocks.append("Medic Cell ally and Boss Rush unlocked") }
         reward = (coins, false)

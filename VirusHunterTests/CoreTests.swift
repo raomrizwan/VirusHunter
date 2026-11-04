@@ -268,17 +268,37 @@ final class CoreTests: XCTestCase {
 
     func testCityRewardsUnlockWeaponsAndSkins() {
         var s = SaveData(); s.unlockedStage = 5
-        XCTAssertEqual(s.lockedWeapons, [.freeze, .missile])
+        XCTAssertEqual(s.lockedWeapons, [.freeze, .missile, .saw, .rain])
         XCTAssertFalse(Loadout().candidates().contains(.weapon(.freeze, toLevel: 1)))
         for lv in 1...2 { for o in Organ.all { s.recordClear(o.at(infection: lv)) } }
         XCTAssertEqual(s.citiesCleared, 2)
-        XCTAssertEqual(s.lockedWeapons, [.missile])
+        XCTAssertEqual(s.lockedWeapons, [.missile, .saw, .rain])
         var l = Loadout(); l.locked = s.lockedWeapons
         XCTAssertTrue(l.candidates().contains(.weapon(.freeze, toLevel: 1)))
         XCTAssertFalse(s.owns(.frost))
         for o in Organ.all { s.recordClear(o.at(infection: 3)) }
         XCTAssertTrue(s.owns(.frost))
         XCTAssertGreaterThan(WeaponStats.missile(evolvedLevel).damage, WeaponStats.missile(1).damage)
+    }
+
+    func testCraftingUsesBossDNA() {
+        var s = SaveData(); s.coins = 10_000
+        let saw = Recipe.all.first { $0.weapon == .saw }!
+        XCTAssertFalse(s.canCraft(saw))
+        s.bossDNA = saw.dna
+        XCTAssertTrue(s.craft(saw))
+        XCTAssertEqual(s.bossDNA, 0)
+        XCTAssertEqual(s.coins, 10_000 - saw.coins)
+        XCTAssertFalse(s.lockedWeapons.contains(.saw))
+        XCTAssertTrue(s.lockedWeapons.contains(.rain))
+        XCTAssertFalse(s.craft(saw))
+        XCTAssertEqual(EnemyKind.bossSumo.dnaDrop, 1)
+        XCTAssertEqual(EnemyKind.bossVira.dnaDrop, 3)
+        XCTAssertEqual(EnemyKind.blob.dnaDrop, 0)
+        XCTAssertGreaterThan(WeaponStats.saw(5).damage, WeaponStats.saw(1).damage)
+        XCTAssertGreaterThan(WeaponStats.rain(5).strikes, WeaponStats.rain(1).strikes)
+        let back = try! JSONDecoder().decode(SaveData.self, from: JSONEncoder().encode(s))
+        XCTAssertEqual(back.crafted, ["saw"])
     }
 
     func testFirstCityKeepsClassicBosses() {

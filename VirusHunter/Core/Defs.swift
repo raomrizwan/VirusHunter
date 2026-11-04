@@ -3,10 +3,12 @@ import Foundation
 // MARK: - Weapons & passives
 
 enum WeaponKind: String, CaseIterable, Codable, Identifiable {
-    case laser, swarm, shield, field, zap, bomb, freeze, missile
+    case laser, swarm, shield, field, zap, bomb, freeze, missile, saw, rain
     var id: String { rawValue }
     /// Weapons earned by saving cities (locked until then).
     static let cityRewards: Set<WeaponKind> = [.freeze, .missile]
+    /// Weapons crafted in the Craft Lab from boss DNA.
+    static let craftable: Set<WeaponKind> = [.saw, .rain]
     var title: String {
         switch self {
         case .laser: return "Pulse Laser"
@@ -17,6 +19,8 @@ enum WeaponKind: String, CaseIterable, Codable, Identifiable {
         case .bomb: return "Cure Bomb"
         case .freeze: return "Freeze Ray"
         case .missile: return "Homing Missiles"
+        case .saw: return "Plasma Saw"
+        case .rain: return "Antibody Rain"
         }
     }
     var symbol: String {
@@ -29,6 +33,8 @@ enum WeaponKind: String, CaseIterable, Codable, Identifiable {
         case .bomb: return "cross.circle.fill"
         case .freeze: return "snowflake"
         case .missile: return "location.north.fill"
+        case .saw: return "gearshape.fill"
+        case .rain: return "cloud.bolt.rain.fill"
         }
     }
     /// Evolved form, reached at level `evolvedLevel` once the weapon is maxed and its partner passive is owned.
@@ -42,6 +48,8 @@ enum WeaponKind: String, CaseIterable, Codable, Identifiable {
         case .bomb: return "Cure Nova"
         case .freeze: return "Absolute Zero"
         case .missile: return "Rocket Storm"
+        case .saw: return "Galaxy Saw"
+        case .rain: return "Cure Monsoon"
         }
     }
     /// The passive that unlocks this weapon's evolution.
@@ -55,6 +63,8 @@ enum WeaponKind: String, CaseIterable, Codable, Identifiable {
         case .bomb: return .regen
         case .freeze: return .magnet
         case .missile: return .power
+        case .saw: return .speed
+        case .rain: return .rapid
         }
     }
     func displayTitle(level l: Int) -> String { l >= evolvedLevel ? evolvedTitle : title }
@@ -71,6 +81,8 @@ enum WeaponKind: String, CaseIterable, Codable, Identifiable {
             case .bomb: return "EVOLVE: giant cure blasts every second."
             case .freeze: return "EVOLVE: a huge frost wave that nearly stops viruses."
             case .missile: return "EVOLVE: six heavy rockets with big blasts."
+            case .saw: return "EVOLVE: six giant saws spinning in a wide ring."
+            case .rain: return "EVOLVE: a storm of antibody strikes every second."
             }
         }
         switch self {
@@ -82,6 +94,8 @@ enum WeaponKind: String, CaseIterable, Codable, Identifiable {
         case .bomb: return l == 1 ? "Drops cure bombs as you fly." : "Bigger blast, faster drops."
         case .freeze: return l == 1 ? "A frost wave slows and chills nearby viruses." : "Bigger, colder, more often."
         case .missile: return l == 1 ? "Fires a missile that chases viruses and explodes." : "+missiles, +damage."
+        case .saw: return l == 1 ? "Plasma saws spin around Nano and slice viruses." : "+1 saw, +damage."
+        case .rain: return l == 1 ? "Antibodies strike random viruses from above." : "+strikes, +damage."
         }
     }
 }
@@ -148,7 +162,7 @@ struct Loadout: Equatable {
     var weaponOrder: [WeaponKind] = [.laser]
     var passives: [PassiveKind: Int] = [:]
     /// Weapons not available yet (city rewards not earned).
-    var locked: Set<WeaponKind> = WeaponKind.cityRewards
+    var locked: Set<WeaponKind> = WeaponKind.cityRewards.union(WeaponKind.craftable)
 
     func level(_ w: WeaponKind) -> Int { weapons[w] ?? 0 }
     func level(_ p: PassiveKind) -> Int { passives[p] ?? 0 }
