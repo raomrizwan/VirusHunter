@@ -301,6 +301,68 @@ final class CoreTests: XCTestCase {
         XCTAssertEqual(back.crafted, ["saw"])
     }
 
+    func testSeasonPassTiersAndReset() {
+        var s = SaveData()
+        let nov = DateComponents(calendar: .current, year: 2026, month: 11, day: 4).date!
+        let dec = DateComponents(calendar: .current, year: 2026, month: 12, day: 1).date!
+        s.refreshSeason(now: nov)
+        XCTAssertEqual(s.seasonKey, "2026-11")
+        XCTAssertEqual(Season.title(s.seasonKey), "November Season")
+        s.seasonXP = 520
+        XCTAssertEqual(s.seasonTier, 5)
+        XCTAssertEqual(s.unclaimedSeasonTiers, 5)
+        let paid = s.claimSeason()
+        XCTAssertEqual(paid.dna, 2)
+        XCTAssertEqual(paid.coins, (1...4).reduce(0) { $0 + 100 + 10 * $1 })
+        XCTAssertEqual(s.unclaimedSeasonTiers, 0)
+        XCTAssertEqual(s.claimSeason().coins, 0)
+        s.seasonXP = 99_999
+        XCTAssertEqual(s.seasonTier, Season.tiers)
+        XCTAssertEqual(Season.reward(tier: 30), .dna(8))
+        s.refreshSeason(now: dec)
+        XCTAssertEqual(s.seasonXP, 0); XCTAssertEqual(s.seasonClaimed, 0)
+        XCTAssertGreaterThan(Season.runXP(kills: 500, bosses: 1, seconds: 240, won: true), Season.runXP(kills: 50, bosses: 0, seconds: 60, won: false))
+        XCTAssertLessThanOrEqual(Season.runXP(kills: 99_999, bosses: 9, seconds: 9_999, won: true), 250)
+    }
+
+    func testOutbreakAlertIsPlayableAndPaysOnce() {
+        var s = SaveData(); s.countryCode = "PK"
+        for day in ["2026-11-01", "2026-11-02", "2026-11-03"] {
+            let a = s.outbreakAlert(day: day)
+            XCTAssertTrue(s.canPlay(a.organID, level: a.level))
+        }
+        XCTAssertEqual(s.outbreakAlert(day: "2026-11-01"), OutbreakAlert(organID: 1, level: 1))
+        for lv in 1...3 { for o in Organ.all { s.recordClear(o.at(infection: lv)) } }
+        let day = "2026-11-05"
+        let a = s.outbreakAlert(day: day)
+        XCTAssertEqual(a, s.outbreakAlert(day: day))
+        XCTAssertTrue(s.canPlay(a.organID, level: a.level))
+        let other = Organ.all[a.organID % 5].at(infection: a.level)
+        XCTAssertFalse(s.claimAlert(other, alert: a, day: day))
+        let coins = s.coins
+        XCTAssertTrue(s.claimAlert(a.organ, alert: a, day: day))
+        XCTAssertEqual(s.coins, coins + OutbreakAlert.coinBonus)
+        XCTAssertEqual(s.bossDNA, OutbreakAlert.dnaBonus)
+        XCTAssertFalse(s.claimAlert(a.organ, alert: a, day: day))
+        XCTAssertFalse(s.claimAlert(.endless, alert: a, day: "2026-11-06"))
+    }
+
+    func testVaccineLabBoostsNextRun() {
+        XCTAssertTrue(VaccineLab.hit(0.5, try: 0))
+        XCTAssertFalse(VaccineLab.hit(0.95, try: 0))
+        XCTAssertEqual(VaccineLab.needle(0), 0, accuracy: 0.001)
+        XCTAssertEqual(VaccineLab.needle(1.25), 1, accuracy: 0.001)
+        XCTAssertEqual(VaccineLab.needle(2.5), 0, accuracy: 0.001)
+        var s = SaveData()
+        let base = PlayerStats.make(save: s, loadout: Loadout())
+        s.labBoost = 3
+        let boosted = PlayerStats.make(save: s, loadout: Loadout())
+        XCTAssertEqual(boosted.damage, base.damage + 3 * VaccineLab.damagePerStar, accuracy: 0.0001)
+        XCTAssertEqual(boosted.maxHP, base.maxHP + 30, accuracy: 0.0001)
+        let back = try! JSONDecoder().decode(SaveData.self, from: JSONEncoder().encode(s))
+        XCTAssertEqual(back.labBoost, 3)
+    }
+
     func testFirstCityKeepsClassicBosses() {
         for o in Organ.all {
             let b = o.bossSetup(country: "PK")

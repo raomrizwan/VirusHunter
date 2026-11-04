@@ -149,3 +149,20 @@ into new weapons that then join the level-up choices for good:
 |---|---|---|---|
 | Plasma Saw | 5 DNA + 1,500 coins | Blades orbit Nano wider than the shield and spin the other way | Galaxy Saw (with Speed) |
 | Antibody Rain | 8 DNA + 2,500 coins | Strikes land on random viruses around Nano | Cure Monsoon (with Rapid Fire) |
+
+## Season Pass (free, monthly)
+
+A new season starts on the 1st of every month (Home: ticket button). 30 tiers, 100 season XP each.
+Every run earns XP: 15 + kills/25 + 20 per boss + 4 per 30 seconds + 50 for a win (max 250).
+Tiers pay coins (110 to 390); tiers 5, 15, 25 pay 2 Boss DNA, tiers 10 and 20 pay 4, tier 30 pays 8.
+
+## Outbreak Alert (daily)
+
+Each day (per country) one organ of the campaign flares up in one of its open cities, shown under
+the mission card on Home. Beating it that day pays +500 coins and +2 Boss DNA once.
+
+## Vaccine Lab (after a win)
+
+After a campaign win the result screen shows a timing game: tap MIX while the needle is in the
+green zone, three tries with a smaller zone each time. Each hit is a star; each star gives the next
+run +8% damage and +10 max health. The boost is used up when that run starts.

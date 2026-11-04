@@ -31,6 +31,8 @@ struct HomeView: View {
 
                 missionCard(s)
                     .padding(.horizontal, 20)
+                alertStrip(s)
+                    .padding(.horizontal, 20).padding(.top, 10)
 
                 LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
                     tile("Tech Lab", "wrench.and.screwdriver.fill", Color(red: 0.75, green: 0.5, blue: 1), sub: "Upgrades", badge: nil) { model.go(.lab) }
@@ -62,11 +64,11 @@ struct HomeView: View {
     }
 
     private func topBar(_ s: SaveData) -> some View {
-        HStack {
+        HStack(spacing: 6) {
             CoinBadge(coins: s.coins)
             Button { model.go(.daily) } label: {
-                Label("Daily", systemImage: "star.circle.fill").font(Theme.body(15, .heavy)).foregroundStyle(Theme.gold)
-                    .padding(.horizontal, 12).frame(height: 42).glass(14)
+                Image(systemName: "star.circle.fill").font(.system(size: 19, weight: .bold)).foregroundStyle(Theme.gold)
+                    .frame(width: 40, height: 40).glass(14)
                     .overlay(alignment: .topTrailing) {
                         let n = s.daily.unclaimed
                         if n > 0 {
@@ -77,6 +79,18 @@ struct HomeView: View {
             }
             .buttonStyle(PressStyle())
             .accessibilityIdentifier("dailyButton")
+            Button { model.go(.season) } label: {
+                Image(systemName: "ticket.fill").font(.system(size: 17, weight: .bold)).foregroundStyle(Theme.lime)
+                    .frame(width: 40, height: 40).glass(14)
+                    .overlay(alignment: .topTrailing) {
+                        if s.unclaimedSeasonTiers > 0 {
+                            Text("\(s.unclaimedSeasonTiers)").font(Theme.body(11, .black)).foregroundStyle(.white)
+                                .frame(width: 20, height: 20).background(Circle().fill(Theme.magenta)).offset(x: 6, y: -6)
+                        }
+                    }
+            }
+            .buttonStyle(PressStyle())
+            .accessibilityIdentifier("seasonButton")
             Spacer()
             toggle("trophy.fill") { model.go(.trophies) }
                 .overlay(alignment: .topTrailing) {
@@ -104,7 +118,7 @@ struct HomeView: View {
                     .rotationEffect(.degrees(Double(i) * 72 + (spin ? 360 : 0)))
             }
             Button { model.go(.skins) } label: {
-                Image(s.skin.texture(.happy)).resizable().scaledToFit().frame(width: 175)
+                Image(s.skin.texture(.happy)).resizable().scaledToFit().frame(width: 160)
             }
             .buttonStyle(PressStyle())
             .offset(y: float ? -8 : 6)
@@ -113,7 +127,7 @@ struct HomeView: View {
                     .offset(x: -110, y: float ? 40 : 52)
             }
         }
-        .frame(height: 225)
+        .frame(height: 195)
         .frame(maxWidth: .infinity)
     }
 
@@ -147,6 +161,35 @@ struct HomeView: View {
         .padding(14).glass(20)
     }
 
+    /// Today's Outbreak Alert: one organ flares up; beating it today pays a bonus once.
+    private func alertStrip(_ s: SaveData) -> some View {
+        let a = s.outbreakAlert()
+        let done = s.alertDone()
+        return Button {
+            Sound.tap.play(); Haptics.light()
+            if !done { model.play(a.organ) }
+        } label: {
+            HStack(spacing: 10) {
+                Image(systemName: done ? "checkmark.shield.fill" : "light.beacon.max.fill")
+                    .font(.system(size: 20, weight: .bold)).foregroundStyle(done ? Theme.lime : Theme.red)
+                    .opacity(done || pulse ? 1 : 0.5)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(done ? "OUTBREAK ALERT CONTAINED" : "OUTBREAK ALERT: \(a.organ.name.uppercased())")
+                        .font(Theme.body(12, .black)).foregroundStyle(done ? Theme.lime : Theme.red).lineLimit(1).minimumScaleFactor(0.7)
+                    Text(done ? "A new alert comes tomorrow" : "\(s.country.city(a.level)) · win today for +\(OutbreakAlert.coinBonus) coins and 🧬 \(OutbreakAlert.dnaBonus)")
+                        .font(Theme.body(11)).foregroundStyle(Theme.muted).lineLimit(1).minimumScaleFactor(0.7)
+                }
+                Spacer(minLength: 0)
+                if !done { Image(systemName: "play.fill").font(.system(size: 14, weight: .black)).foregroundStyle(.white) }
+            }
+            .padding(.horizontal, 12).frame(height: 48).glass(14)
+            .overlay(RoundedRectangle(cornerRadius: 14).stroke((done ? Theme.lime : Theme.red).opacity(0.5), lineWidth: 1))
+        }
+        .buttonStyle(PressStyle())
+        .disabled(done)
+        .accessibilityIdentifier("alertButton")
+    }
+
     private func tile(_ title: String, _ icon: String, _ color: Color, sub: String, badge: String?, _ action: @escaping () -> Void) -> some View {
         Button { Sound.tap.play(); Haptics.light(); action() } label: {
             VStack(spacing: 3) {
@@ -169,7 +212,7 @@ struct HomeView: View {
 
     private func toggle(_ icon: String, _ action: @escaping () -> Void) -> some View {
         Button { action(); Sound.tap.play() } label: {
-            Image(systemName: icon).font(.system(size: 17, weight: .bold)).foregroundStyle(.white).frame(width: 42, height: 42).glass(14)
+            Image(systemName: icon).font(.system(size: 17, weight: .bold)).foregroundStyle(.white).frame(width: 40, height: 40).glass(14)
         }
     }
 }

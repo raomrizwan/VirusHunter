@@ -13,7 +13,7 @@ struct VirusHunterApp: App {
 /// App-wide state: saved progress and which screen is showing.
 @MainActor
 final class AppModel: ObservableObject {
-    enum Screen: Equatable { case home, map, lab, skins, daily, trophies, pedia, allies, game(Organ) }
+    enum Screen: Equatable { case home, map, lab, skins, daily, trophies, pedia, allies, season, game(Organ) }
 
     @Published var save: SaveData
     @Published var screen: Screen
@@ -118,6 +118,7 @@ struct RootView: View {
             case .trophies: TrophiesView().transition(.move(edge: .trailing))
             case .pedia: PediaView().transition(.move(edge: .trailing))
             case .allies: AlliesView().transition(.move(edge: .trailing))
+            case .season: SeasonView().transition(.move(edge: .trailing))
             case .game(let organ): GameView(organ: organ).transition(.opacity).id("\(organ.id)-\(organ.infection)")
             }
             if model.needsCountry || model.pickingCountry {

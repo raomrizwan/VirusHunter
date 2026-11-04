@@ -47,6 +47,10 @@ struct GameContent: View {
             overlay(st)
         }
         .statusBarHidden(true)
+        .onAppear {
+            // The Vaccine Lab boost lasts for one run (the scene already read it).
+            if model.save.labBoost > 0 { model.save.labBoost = 0; model.persist() }
+        }
         .animation(.easeOut(duration: 0.3), value: st.moveHint)
         .onChange(of: st.phase) { _, p in
             if case .finished(let won) = p { finish(won: won) }
@@ -64,7 +68,8 @@ struct GameContent: View {
         case .dead(let canRevive): DeadView(skin: model.save.skin, canRevive: canRevive, freeRevive: model.save.level(.revive) > 0 && st.revivesUsed == 0,
                                             onRevive: revive, onGiveUp: { holder.scene.giveUp() })
         case .finished(let won): ResultView(organ: organ, won: won, state: st, reward: reward, save: model.save, unlocks: unlocks,
-                                            onDouble: doubleCoins, onDone: leave, onNext: nextMission)
+                                            onDouble: doubleCoins, onDone: leave, onNext: nextMission,
+                                            onVaccine: { model.save.labBoost = $0; model.persist() })
         }
     }
 
@@ -100,6 +105,12 @@ struct GameContent: View {
         s.bestCombo = max(s.bestCombo, r.combo)
         let dna = holder.scene.dnaEarned
         s.bossDNA += dna
+        // Season Pass XP and today's Outbreak Alert bonus
+        s.refreshSeason()
+        let tierBefore = s.seasonTier
+        s.seasonXP += Season.runXP(kills: r.kills, bosses: r.bosses, seconds: r.time, won: won)
+        let newTiers = s.seasonTier - tierBefore
+        let alertPaid = won && s.claimAlert(organ, alert: before.outbreakAlert())
         var rushLine: String?
         if organ.isBossRush, won {
             let week = BossRush.week()
@@ -120,6 +131,8 @@ struct GameContent: View {
         unlocks = newUnlocks(before: before, after: s)
         if let rushLine { unlocks.insert(rushLine, at: 0) }
         if dna > 0 { unlocks.append("🧬 +\(dna) Boss DNA for the Craft Lab") }
+        if alertPaid { unlocks.insert("🚨 Outbreak Alert contained! +\(OutbreakAlert.coinBonus) coins, +\(OutbreakAlert.dnaBonus) Boss DNA", at: 0) }
+        if newTiers > 0 { unlocks.append("🎟️ Season Pass tier \(s.seasonTier) reached") }
         if !newCards.isEmpty { unlocks.append("📖 \(newCards.count) new Virus-pedia card\(newCards.count == 1 ? "" : "s") (+\(newCards.count * Pedia.coinsPerCard) coins)") }
         if s.citiesCleared >= 1, before.citiesCleared == 0 { unlocks.append("Medic Cell ally and Boss Rush unlocked") }
         reward = (coins, false)
@@ -400,11 +413,14 @@ struct ResultView: View {
     var onDouble: () -> Void
     var onDone: () -> Void
     var onNext: () -> Void
+    var onVaccine: (Int) -> Void = { _ in }
     @State private var appear = false
 
     var body: some View {
         ZStack {
             Color.black.opacity(0.7).ignoresSafeArea()
+            GeometryReader { g in
+            ScrollView(showsIndicators: false) {
             VStack(spacing: 16) {
                 Image(save.skin.texture(won ? .joy : .hurt)).resizable().scaledToFit().frame(width: unlocks.isEmpty ? 140 : 110)
                     .scaleEffect(appear ? 1 : 0.5).rotationEffect(.degrees(appear ? 0 : -20))
@@ -430,6 +446,9 @@ struct ResultView: View {
                             .accessibilityIdentifier("doubleButton")
                     }
                 }
+                if won && !organ.isSideMode && reward != nil {
+                    VaccineLabCard(onDone: onVaccine)
+                }
                 ForEach(unlocks, id: \.self) { u in
                     Label(u, systemImage: u.contains("cured") ? "cross.case.fill" : u.hasPrefix("Daily") ? "star.fill" : "lock.open.fill").font(Theme.body(16, .heavy)).foregroundStyle(Theme.lime)
                 }
@@ -443,7 +462,10 @@ struct ResultView: View {
                 GameButton(title: "Continue", colors: [Color(white: 0.5), Color(white: 0.28)], height: 52, action: onDone)
                     .accessibilityIdentifier("continueButton")
             }
-            .padding(.horizontal, 28)
+            .padding(.horizontal, 28).padding(.vertical, 20)
+            .frame(minHeight: g.size.height)
+            }
+            }
         }
         .onAppear { withAnimation(.spring(duration: 0.6, bounce: 0.4)) { appear = true } }
     }
@@ -455,6 +477,73 @@ struct ResultView: View {
             Text(t).font(Theme.body(12)).foregroundStyle(Theme.muted)
         }
         .frame(maxWidth: .infinity).padding(.vertical, 12).glass(16)
+    }
+}
+
+// MARK: - Vaccine Lab
+
+/// After a campaign win: tap MIX while the needle is in the green zone, three tries.
+/// Each hit is a star; stars boost the next run.
+struct VaccineLabCard: View {
+    var onDone: (Int) -> Void
+    @State private var start = Date()
+    @State private var tries = 0
+    @State private var stars = 0
+    @State private var flash: Bool?
+
+    var body: some View {
+        VStack(spacing: 8) {
+            HStack {
+                Image("dr-leuko").resizable().scaledToFit().frame(width: 34, height: 34)
+                Text("VACCINE LAB").font(Theme.body(14, .black)).foregroundStyle(Theme.lime)
+                Spacer()
+                Text(String(repeating: "★", count: stars) + String(repeating: "☆", count: VaccineLab.tries - stars))
+                    .font(Theme.body(18, .black)).foregroundStyle(Theme.gold)
+            }
+            if tries < VaccineLab.tries {
+                Text("Tap MIX when the needle is in the green zone. Each hit boosts your next run.")
+                    .font(Theme.body(12)).foregroundStyle(Theme.muted).frame(maxWidth: .infinity, alignment: .leading)
+                HStack(spacing: 10) {
+                    TimelineView(.animation) { ctx in
+                        GeometryReader { g in
+                            let z = VaccineLab.zones[tries]
+                            let pos = VaccineLab.needle(ctx.date.timeIntervalSince(start))
+                            ZStack(alignment: .leading) {
+                                Capsule().fill(.white.opacity(0.12))
+                                Capsule().fill(Theme.lime.opacity(0.7))
+                                    .frame(width: g.size.width * z.width)
+                                    .offset(x: g.size.width * (z.center - z.width / 2))
+                                RoundedRectangle(cornerRadius: 2).fill(.white).frame(width: 4, height: 30)
+                                    .offset(x: g.size.width * pos - 2)
+                            }
+                        }
+                    }
+                    .frame(height: 26)
+                    Button(action: mix) {
+                        Text("MIX").font(Theme.body(15, .black)).foregroundStyle(.white)
+                            .frame(width: 70, height: 40)
+                            .background(RoundedRectangle(cornerRadius: 12).fill(flash == false ? Theme.red : Theme.lime.opacity(0.85)))
+                    }
+                    .buttonStyle(PressStyle())
+                    .accessibilityIdentifier("mixButton")
+                }
+            } else {
+                Text(stars > 0 ? "Vaccine ready: \(VaccineLab.boostText(stars))" : "The mix failed. Next time!")
+                    .font(Theme.body(13, .heavy)).foregroundStyle(stars > 0 ? Theme.lime : Theme.muted)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+        .padding(12).glass(16)
+    }
+
+    private func mix() {
+        guard tries < VaccineLab.tries else { return }
+        let hit = VaccineLab.hit(VaccineLab.needle(Date().timeIntervalSince(start)), try: tries)
+        if hit { stars += 1; Sound.coin.play(); Haptics.success() } else { Haptics.error() }
+        flash = hit
+        tries += 1
+        start = Date()
+        if tries == VaccineLab.tries { onDone(stars) }
     }
 }
 

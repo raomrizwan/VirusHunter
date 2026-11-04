@@ -87,6 +87,11 @@ struct SaveData: Codable, Equatable {
     var bestCities = 0
     var bossDNA = 0                             // crafting material from bosses
     var crafted: Set<String> = []               // weapons crafted in the Craft Lab
+    var seasonKey = ""                          // month of the current Season Pass ("2026-11")
+    var seasonXP = 0
+    var seasonClaimed = 0                       // highest season tier paid out
+    var alertClaimedDay = ""                    // day the Outbreak Alert bonus was paid
+    var labBoost = 0                            // Vaccine Lab stars for the next run (0...3)
 
     func level(_ t: TechKind) -> Int { tech[t.rawValue] ?? 0 }
     func rank(_ t: TechKind) -> Int { ranks[t.rawValue] ?? 0 }
@@ -198,6 +203,11 @@ extension SaveData {
         bestCities = try c.decodeIfPresent(Int.self, forKey: .bestCities) ?? d.bestCities
         bossDNA = try c.decodeIfPresent(Int.self, forKey: .bossDNA) ?? d.bossDNA
         crafted = try c.decodeIfPresent(Set<String>.self, forKey: .crafted) ?? d.crafted
+        seasonKey = try c.decodeIfPresent(String.self, forKey: .seasonKey) ?? d.seasonKey
+        seasonXP = try c.decodeIfPresent(Int.self, forKey: .seasonXP) ?? d.seasonXP
+        seasonClaimed = try c.decodeIfPresent(Int.self, forKey: .seasonClaimed) ?? d.seasonClaimed
+        alertClaimedDay = try c.decodeIfPresent(String.self, forKey: .alertClaimedDay) ?? d.alertClaimedDay
+        labBoost = try c.decodeIfPresent(Int.self, forKey: .labBoost) ?? d.labBoost
         bestCities = max(bestCities, citiesCleared)
     }
 }
@@ -219,10 +229,10 @@ struct PlayerStats: Equatable {
     static func make(save: SaveData, loadout: Loadout) -> PlayerStats {
         let p = loadout.passives
         return PlayerStats(
-            maxHP: 100 + save.power(.health) * 10 + Double((p[.maxHP] ?? 0) * 20),
+            maxHP: 100 + save.power(.health) * 10 + Double((p[.maxHP] ?? 0) * 20) + VaccineLab.healthPerStar * Double(save.labBoost),
             speed: PlayerStats.baseSpeed * (1 + 0.03 * save.power(.speed) + 0.08 * Double(p[.speed] ?? 0)),
             magnet: 120 * (1 + 0.08 * save.power(.magnet) + 0.30 * Double(p[.magnet] ?? 0)),
-            damage: 1 + 0.05 * save.power(.power) + 0.10 * Double(p[.power] ?? 0),
+            damage: 1 + 0.05 * save.power(.power) + 0.10 * Double(p[.power] ?? 0) + VaccineLab.damagePerStar * Double(save.labBoost),
             cooldown: max(0.5, 1 - 0.08 * Double(p[.rapid] ?? 0)),
             armor: min(0.5, 0.03 * save.power(.armor)),
             regen: 0.6 * Double(p[.regen] ?? 0),
