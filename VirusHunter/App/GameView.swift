@@ -590,7 +590,7 @@ struct GoalCard: View {
                 GeometryReader { g in
                     ZStack(alignment: .leading) {
                         Capsule().fill(.black.opacity(0.45))
-                        Capsule().fill(LinearGradient(kind: .reward, startPoint: .leading, endPoint: .trailing))
+                        Capsule().fill(LinearGradient(colors: [Theme.gold, Color(red: 1, green: 0.55, blue: 0.2)], startPoint: .leading, endPoint: .trailing))
                             .frame(width: max(8, g.size.width * fill))
                     }
                 }
