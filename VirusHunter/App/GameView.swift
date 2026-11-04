@@ -432,6 +432,7 @@ struct ResultView: View {
     var onNext: () -> Void
     var onVaccine: (Int) -> Void = { _ in }
     @State private var appear = false
+    @State private var showAllUnlocks = false
 
     var body: some View {
         ZStack {
@@ -466,9 +467,17 @@ struct ResultView: View {
                 if won && !organ.isSideMode && reward != nil {
                     VaccineLabCard(onDone: onVaccine)
                 }
-                ForEach(unlocks, id: \.self) { u in
+                ForEach(showAllUnlocks ? unlocks : Array(unlocks.prefix(3)), id: \.self) { u in
                     Label(u, systemImage: u.contains("cured") ? "cross.case.fill" : u.hasPrefix("Daily") ? "star.fill" : "lock.open.fill").font(Theme.body(13, .heavy)).foregroundStyle(Theme.lime)
                         .lineLimit(2).minimumScaleFactor(0.8).frame(maxWidth: .infinity, alignment: .leading)
+                }
+                if unlocks.count > 3 && !showAllUnlocks {
+                    Button { withAnimation { showAllUnlocks = true } } label: {
+                        Text("+\(unlocks.count - 3) more").font(Theme.body(13, .heavy)).foregroundStyle(Theme.cyan)
+                            .padding(.horizontal, 14).frame(height: 30).background(Capsule().fill(Theme.cyan.opacity(0.15)))
+                    }
+                    .buttonStyle(PressStyle())
+                    .accessibilityIdentifier("moreUnlocks")
                 }
                 if let r = reward, let g = save.nextGoal, unlocks.count < 3 {
                     GoalCard(goal: g, coins: save.coins, earned: r.coins)
