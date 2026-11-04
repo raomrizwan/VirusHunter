@@ -17,6 +17,8 @@ final class AppModel: ObservableObject {
 
     @Published var save: SaveData
     @Published var screen: Screen
+    @Published var story: ActiveStory?
+    @Published var pickingCountry = false
 
     static let args = ProcessInfo.processInfo.arguments
     static var uiTesting: Bool { args.contains("-uitesting") }
@@ -45,6 +47,54 @@ final class AppModel: ObservableObject {
     func persist() { SaveStore.shared.save(save) }
 
     func go(_ s: Screen) { withAnimation(.easeInOut(duration: 0.3)) { screen = s } }
+
+    /// Starts a run, showing the organ's story intro first when there is one.
+    func play(_ organ: Organ) {
+        if let s = Story.intro(for: organ, save: save), !AppModel.uiTesting {
+            showStory(s) { [weak self] in self?.go(.game(organ)) }
+        } else {
+            go(.game(organ))
+        }
+    }
+
+    /// Shows a story scene (marked as seen right away, so skipping or quitting never repeats it).
+    func showStory(_ scene: StoryScene, then: (() -> Void)? = nil) {
+        guard !AppModel.uiTesting else { then?(); return }
+        save.seenStory.insert(scene.id)
+        persist()
+        withAnimation { story = ActiveStory(scene: scene, onDone: then) }
+    }
+
+    /// Replays a seen scene from the Story journal.
+    func replayStory(_ scene: StoryScene) {
+        let s = Story.resolve(scene, country: save.country, city: Story.city(for: scene.id))
+        withAnimation { story = ActiveStory(scene: s, onDone: nil) }
+    }
+
+    func closeStory() {
+        let done = story?.onDone
+        withAnimation { story = nil }
+        done?()
+    }
+
+    /// The active city's arrival scene, shown when the Body Map opens.
+    func checkMapStory() {
+        guard screen == .map, story == nil, save.countryCode != nil, let s = Story.mapScene(save: save) else { return }
+        showStory(s)
+    }
+
+    func setCountry(_ code: String) {
+        save.countryCode = code
+        persist()
+        withAnimation { pickingCountry = false }
+        checkMapStory()
+    }
+
+    /// Ask for the country once the player reaches the menus (a fresh install starts straight in a run).
+    var needsCountry: Bool {
+        if case .game = screen { return false }
+        return save.countryCode == nil && !AppModel.uiTesting
+    }
 }
 
 struct RootView: View {
@@ -57,6 +107,12 @@ struct RootView: View {
             case .lab: LabView().transition(.move(edge: .trailing))
             case .skins: SkinsView().transition(.move(edge: .trailing))
             case .game(let organ): GameView(organ: organ).transition(.opacity).id("\(organ.id)-\(organ.infection)")
+            }
+            if model.needsCountry || model.pickingCountry {
+                CountryPicker().transition(.opacity).zIndex(5)
+            }
+            if let st = model.story {
+                StoryView(story: st) { model.closeStory() }.id(st.id).transition(.opacity).zIndex(10)
             }
         }
         .onAppear {

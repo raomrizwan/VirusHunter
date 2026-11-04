@@ -346,6 +346,78 @@ def imageset(name, png, scale=3):
     json.dump({"images": [{"idiom": "universal", "filename": fn, "scale": f"{scale}x"}], "info": {"author": "xcode", "version": 1}}, open(os.path.join(d, "Contents.json"), "w"))
 
 
+# ---------------------------------------------------------------- story portraits
+def leuko(size=512):
+    """Dr. Leuko: a friendly white blood cell commander with glasses, headset and a red-cross cap."""
+    defs = '''<radialGradient id="lk" cx="38%" cy="30%" r="80%"><stop offset="0" stop-color="#FFFFFF"/><stop offset=".6" stop-color="#EDE8FF"/><stop offset="1" stop-color="#B8AEE0"/></radialGradient>
+    <radialGradient id="lkn" cx="40%" cy="35%" r="70%"><stop offset="0" stop-color="#E7B8FF"/><stop offset="1" stop-color="#9B5BD6"/></radialGradient>
+    <filter id="lkg" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="14"/></filter>'''
+    # bumpy cell outline
+    pts = []
+    for i in range(18):
+        a = 2 * math.pi * i / 18
+        r = 175 + (12 if i % 2 else -6)
+        pts.append((256 + math.cos(a) * r, 270 + math.sin(a) * r))
+    d = f"M{pts[0][0]} {pts[0][1]} " + " ".join(
+        f"Q{256 + math.cos(2*math.pi*(i+0.5)/18)*205} {270 + math.sin(2*math.pi*(i+0.5)/18)*205} {pts[(i+1)%18][0]} {pts[(i+1)%18][1]}" for i in range(18)) + " Z"
+    body = f'''<circle cx="256" cy="270" r="200" fill="#B8AEE0" opacity=".35" filter="url(#lkg)"/>
+    <path d="{d}" fill="url(#lk)" stroke="#8C7FC4" stroke-width="7"/>
+    <ellipse cx="330" cy="395" rx="40" ry="26" fill="url(#lkn)" opacity=".5"/><ellipse cx="380" cy="360" rx="22" ry="17" fill="url(#lkn)" opacity=".4"/>
+    <!-- cap -->
+    <path d="M150 150 Q256 60 362 150 L350 178 Q256 140 162 178 Z" fill="#FFFFFF" stroke="#8C7FC4" stroke-width="6"/>
+    <rect x="236" y="96" width="40" height="40" rx="6" fill="#FF4D6D"/><path d="M256 104 V128 M244 116 H268" stroke="#fff" stroke-width="7" stroke-linecap="round"/>
+    <!-- glasses + eyes -->
+    <circle cx="206" cy="250" r="42" fill="#fff" stroke="#3A2E6E" stroke-width="9"/><circle cx="306" cy="250" r="42" fill="#fff" stroke="#3A2E6E" stroke-width="9"/>
+    <path d="M248 250 H264" stroke="#3A2E6E" stroke-width="9"/>
+    <circle cx="212" cy="256" r="17" fill="#2A1E52"/><circle cx="300" cy="256" r="17" fill="#2A1E52"/>
+    <circle cx="218" cy="249" r="6" fill="#fff"/><circle cx="306" cy="249" r="6" fill="#fff"/>
+    <path d="M176 198 Q206 184 236 198 M276 198 Q306 184 336 198" stroke="#3A2E6E" stroke-width="8" fill="none" stroke-linecap="round"/>
+    <!-- smile -->
+    <path d="M220 320 Q256 350 292 320" stroke="#3A2E6E" stroke-width="9" fill="none" stroke-linecap="round"/>
+    <circle cx="170" cy="310" r="16" fill="#FF9AC8" opacity=".55"/><circle cx="342" cy="310" r="16" fill="#FF9AC8" opacity=".55"/>
+    <!-- headset -->
+    <path d="M96 260 Q96 120 256 112" stroke="#2DD4FF" stroke-width="12" fill="none" stroke-linecap="round" opacity="0"/>
+    <rect x="70" y="232" width="34" height="62" rx="14" fill="#2DD4FF" stroke="#0A6F8E" stroke-width="5"/>
+    <path d="M90 292 Q110 360 182 352" stroke="#0A6F8E" stroke-width="7" fill="none" stroke-linecap="round"/>
+    <circle cx="186" cy="352" r="11" fill="#2DD4FF" stroke="#0A6F8E" stroke-width="4"/>'''
+    return wrap(body, size, size, defs)
+
+
+def vex(size=512):
+    """King Vex: the dark virus mastermind with a spiked crown, cape and one glowing eye."""
+    c = 256
+    defs = '''<radialGradient id="vx" cx="36%" cy="30%" r="80%"><stop offset="0" stop-color="#C77DFF"/><stop offset=".55" stop-color="#6A1B9A"/><stop offset="1" stop-color="#2A0638"/></radialGradient>
+    <linearGradient id="vc" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#E0213F"/><stop offset="1" stop-color="#6E0618"/></linearGradient>
+    <radialGradient id="ve" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#FFFFFF"/><stop offset=".35" stop-color="#FFE45C"/><stop offset="1" stop-color="#FF3D00"/></radialGradient>
+    <filter id="vg" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="16"/></filter>'''
+    parts = [f'<circle cx="{c}" cy="290" r="210" fill="#B23CFF" opacity=".35" filter="url(#vg)"/>',
+             # cape
+             f'<path d="M90 300 Q60 470 120 500 L392 500 Q452 470 422 300 Q256 380 90 300 Z" fill="url(#vc)" stroke="#3A0010" stroke-width="7"/>',
+             f'<path d="M120 300 Q256 360 392 300 L380 330 Q256 390 132 330 Z" fill="#F2F2F2" stroke="#9A9A9A" stroke-width="4"/>']
+    for i in range(14):
+        a = 2 * math.pi * i / 14
+        x1, y1 = c + math.cos(a) * 130, 280 + math.sin(a) * 130
+        x2, y2 = c + math.cos(a) * 190, 280 + math.sin(a) * 190
+        if math.sin(a) < -0.55:  # crown sits on top
+            continue
+        parts.append(f'<line x1="{x1}" y1="{y1}" x2="{x2}" y2="{y2}" stroke="#2A0638" stroke-width="16" stroke-linecap="round"/>')
+        parts.append(f'<circle cx="{x2}" cy="{y2}" r="19" fill="url(#vx)" stroke="#2A0638" stroke-width="5"/>')
+    parts.append(f'<circle cx="{c}" cy="280" r="150" fill="url(#vx)" stroke="#2A0638" stroke-width="8"/>')
+    # crown
+    parts.append('<path d="M146 168 L130 50 L194 118 L226 30 L256 110 L286 30 L318 118 L382 50 L366 168 Q256 136 146 168 Z" fill="#1A1A1A" stroke="#FFD34D" stroke-width="8"/>')
+    parts.append('<circle cx="256" cy="140" r="16" fill="#FF3D6A"/><circle cx="190" cy="148" r="10" fill="#3FE6FF"/><circle cx="322" cy="148" r="10" fill="#3FE6FF"/>')
+    # eyes: one big glowing, one scarred slit
+    parts.append('<circle cx="300" cy="262" r="46" fill="url(#ve)"/><circle cx="300" cy="262" r="62" fill="#FFB000" opacity=".35" filter="url(#vg)"/>')
+    parts.append('<ellipse cx="300" cy="262" rx="9" ry="30" fill="#1A0010"/>')
+    parts.append('<path d="M180 262 Q210 248 240 262" stroke="#FFE45C" stroke-width="10" fill="none" stroke-linecap="round"/>')
+    parts.append('<path d="M176 222 L246 246 M250 214 L350 226" stroke="#14001C" stroke-width="14" stroke-linecap="round"/>')
+    # grin
+    parts.append('<path d="M186 330 Q256 392 330 322 Q256 352 186 330 Z" fill="#14001C"/>')
+    parts.append('<path d="M206 338 L216 356 L228 342 M246 348 L256 366 L266 348 M286 342 L298 356 L308 334" fill="#fff" stroke="#fff" stroke-width="3"/>')
+    parts.append('<ellipse cx="200" cy="200" rx="40" ry="18" fill="#fff" opacity=".25" transform="rotate(-30 200 200)"/>')
+    return wrap("".join(parts), size, size, defs)
+
+
 if __name__ == "__main__":
     items = []
     for e in ["happy", "fight", "joy", "hurt"]:
@@ -360,6 +432,7 @@ if __name__ == "__main__":
               ("glow", glow()), ("glow-pink", glow(128, "#FF6BD5")), ("glow-gold", glow(128, "#FFE45C")), ("bolt", bolt()), ("bomb", bomb()), ("slime", slime())]
     for o in ORGANS:
         items.append((f"bg-{o}", backdrop(o)))
+    items += [("dr-leuko", leuko()), ("king-vex", vex())]
     items.append(("icon", icon()))
     asyncio.run(render(items))
     for name, _ in items:

@@ -67,6 +67,8 @@ struct SaveData: Codable, Equatable {
     var skinID: String = Skin.classic.rawValue
     var ranks: [String: Int] = [:]              // Mutation Ranks bought after a tech is MAX
     var infectionCleared: [String: Int] = [:]   // organ id -> highest Infection Level cleared
+    var seenStory: Set<String> = []             // story scene ids already shown
+    var countryCode: String?                    // chosen outbreak country (nil = not asked yet)
 
     func level(_ t: TechKind) -> Int { tech[t.rawValue] ?? 0 }
     func rank(_ t: TechKind) -> Int { ranks[t.rawValue] ?? 0 }
@@ -93,8 +95,11 @@ struct SaveData: Codable, Equatable {
     func clearedInfection(_ organID: Int) -> Int {
         max(infectionCleared[String(organID)] ?? 0, clearedStages.contains(organID) ? 1 : 0)
     }
-    /// Highest Infection Level the player may start for an organ.
-    func unlockedInfection(_ organID: Int) -> Int { max(1, min(Organ.maxInfection, clearedInfection(organID) + 1)) }
+    /// Highest Infection Level (city) the player may start for an organ: one above what it has cleared,
+    /// but never past the active city (every organ must be cleared in a city before the next opens).
+    func unlockedInfection(_ organID: Int) -> Int {
+        max(1, min(Organ.maxInfection, clearedInfection(organID) + 1, citiesCleared + 1))
+    }
 
     mutating func recordClear(_ o: Organ) {
         guard !o.isEndless else { return }
@@ -125,6 +130,8 @@ extension SaveData {
         skinID = try c.decodeIfPresent(String.self, forKey: .skinID) ?? d.skinID
         ranks = try c.decodeIfPresent([String: Int].self, forKey: .ranks) ?? d.ranks
         infectionCleared = try c.decodeIfPresent([String: Int].self, forKey: .infectionCleared) ?? d.infectionCleared
+        seenStory = try c.decodeIfPresent(Set<String>.self, forKey: .seenStory) ?? d.seenStory
+        countryCode = try c.decodeIfPresent(String.self, forKey: .countryCode)
     }
 }
 

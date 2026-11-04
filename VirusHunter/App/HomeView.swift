@@ -78,7 +78,7 @@ struct HomeView: View {
                         GameButton(title: "Endless", icon: "infinity",
                                    colors: model.save.endlessUnlocked ? [Color(red: 1, green: 0.55, blue: 0.75), Color(red: 0.9, green: 0.2, blue: 0.5)] : [.gray, Color(white: 0.3)],
                                    height: 56) {
-                            if model.save.endlessUnlocked { model.go(.game(.endless)) }
+                            if model.save.endlessUnlocked { model.play(.endless) }
                         }
                         .overlay(alignment: .topTrailing) {
                             if !model.save.endlessUnlocked {

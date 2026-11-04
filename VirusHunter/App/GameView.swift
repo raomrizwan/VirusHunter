@@ -64,7 +64,7 @@ struct GameContent: View {
         case .dead(let canRevive): DeadView(skin: model.save.skin, canRevive: canRevive, freeRevive: model.save.level(.revive) > 0 && st.revivesUsed == 0,
                                             onRevive: revive, onGiveUp: { holder.scene.giveUp() })
         case .finished(let won): ResultView(organ: organ, won: won, state: st, reward: reward, save: model.save, unlocks: unlocks,
-                                            onDouble: doubleCoins, onDone: leave, onNext: nextOrgan, onHarder: harder)
+                                            onDouble: doubleCoins, onDone: leave, onNext: nextMission)
         }
     }
 
@@ -90,11 +90,13 @@ struct GameContent: View {
         s.runs += 1
         s.totalKills += r.kills
         if won { s.recordClear(organ) }
+        let scene = won ? Story.afterWin(organ, before: model.save, after: s) : nil
         if organ.isEndless { s.bestEndless = max(s.bestEndless, r.time) }
         model.save = s
         model.persist()
         unlocks = newUnlocks(before: before, after: s)
         reward = (coins, false)
+        if let scene { DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { model.showStory(scene) } }
     }
 
     /// Lines like "Heart unlocked" for the result screen, so the player sees what this run opened up.
@@ -102,8 +104,13 @@ struct GameContent: View {
         var out: [String] = []
         if after.unlockedStage > before.unlockedStage { out.append("\(Organ.all[after.unlockedStage - 1].name) unlocked") }
         if after.endlessUnlocked && !before.endlessUnlocked { out.append("Endless mode unlocked") }
-        if !organ.isEndless, after.unlockedInfection(organ.id) > before.unlockedInfection(organ.id) {
-            out.append("\(organ.name) Infection Level \(after.unlockedInfection(organ.id)) unlocked")
+        if !organ.isEndless {
+            let cured = before.infected(inCity: organ.infection) - after.infected(inCity: organ.infection)
+            if cured > 0 { out.append("\(cured.formatted()) people cured in \(after.country.city(organ.infection))") }
+        }
+        if after.citiesCleared > before.citiesCleared {
+            out.append("\(after.country.city(after.citiesCleared)) saved!")
+            if after.citiesCleared < Organ.maxInfection { out.append("Outbreak in \(after.country.city(after.currentCity)) unlocked") }
         }
         for k in Skin.allCases where after.owns(k) && !before.owns(k) { out.append("\(k.title) unlocked") }
         return out
@@ -125,15 +132,10 @@ struct GameContent: View {
         InterstitialController.shared.showIfAllowed(gamesPlayed: model.save.runs) { model.go(organ.isEndless ? .home : .map) }
     }
 
-    /// Replay the same organ one Infection Level higher.
-    private func harder() {
-        let next = organ.at(infection: organ.infection + 1)
-        InterstitialController.shared.showIfAllowed(gamesPlayed: model.save.runs) { model.go(.game(next)) }
-    }
-
-    private func nextOrgan() {
-        let next = Organ.all[min(4, organ.id)]
-        InterstitialController.shared.showIfAllowed(gamesPlayed: model.save.runs) { model.go(.game(next)) }
+    /// The next organ to clear in the active city (or the first one in the next city).
+    private func nextMission() {
+        guard let next = model.save.nextMission else { leave(); return }
+        InterstitialController.shared.showIfAllowed(gamesPlayed: model.save.runs) { model.play(next) }
     }
 }
 
@@ -354,7 +356,6 @@ struct ResultView: View {
     var onDouble: () -> Void
     var onDone: () -> Void
     var onNext: () -> Void
-    var onHarder: () -> Void
     @State private var appear = false
 
     var body: some View {
@@ -363,8 +364,12 @@ struct ResultView: View {
             VStack(spacing: 16) {
                 Image(save.skin.texture(won ? .joy : .hurt)).resizable().scaledToFit().frame(width: unlocks.isEmpty ? 140 : 110)
                     .scaleEffect(appear ? 1 : 0.5).rotationEffect(.degrees(appear ? 0 : -20))
-                Text(won ? "\(organ.name.uppercased())\(organ.infection > 1 ? " LV \(organ.infection)" : "") CLEARED!" : organ.isEndless ? "YOU SURVIVED" : "INFECTED!")
+                Text(won ? "\(organ.name.uppercased()) CLEARED!" : organ.isEndless ? "YOU SURVIVED" : "INFECTED!")
                     .font(Theme.title(32)).foregroundStyle(won ? Theme.lime : .white).multilineTextAlignment(.center)
+                if !organ.isEndless {
+                    Label("\(save.country.city(organ.infection)), \(save.country.name)", systemImage: "mappin.and.ellipse")
+                        .font(Theme.body(14, .bold)).foregroundStyle(Theme.muted)
+                }
                 HStack(spacing: 10) {
                     stat("Time", state.timeText, "clock.fill")
                     stat("Kills", "\(state.kills)", "scope")
@@ -382,17 +387,14 @@ struct ResultView: View {
                     }
                 }
                 ForEach(unlocks, id: \.self) { u in
-                    Label(u, systemImage: "lock.open.fill").font(Theme.body(16, .heavy)).foregroundStyle(Theme.lime)
+                    Label(u, systemImage: u.contains("cured") ? "cross.case.fill" : "lock.open.fill").font(Theme.body(16, .heavy)).foregroundStyle(Theme.lime)
                 }
                 if let r = reward, let g = save.nextGoal {
                     GoalCard(goal: g, coins: save.coins, earned: r.coins)
                 }
-                if won && !organ.isEndless && organ.id < 5 && organ.infection == 1 {
-                    GameButton(title: "Next organ", icon: "arrow.right", action: onNext).accessibilityIdentifier("nextButton")
-                } else if won && !organ.isEndless && organ.infection < Organ.maxInfection {
-                    GameButton(title: "Infection Level \(organ.infection + 1)", icon: "flame.fill",
-                               colors: [Theme.magenta, Color(red: 0.6, green: 0.1, blue: 0.5)], action: onHarder)
-                        .accessibilityIdentifier("harderButton")
+                if won && !organ.isEndless, let next = save.nextMission {
+                    GameButton(title: "Next: \(next.name) · \(save.country.city(next.infection))", icon: "arrow.right", action: onNext)
+                        .accessibilityIdentifier("nextButton")
                 }
                 GameButton(title: "Continue", colors: [Color(white: 0.5), Color(white: 0.28)], height: 52, action: onDone)
                     .accessibilityIdentifier("continueButton")

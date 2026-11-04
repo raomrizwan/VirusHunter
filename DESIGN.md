@@ -55,8 +55,16 @@ Elites (every minute): bigger, glowing ring, drop a chest (free upgrade).
 6. **Endless** (unlocked after stage 2) — survive as long as possible, leaderboard-style best time.
 Difficulty scales with stage number.
 
+### Story + outbreak cities
+On reaching the menus the player picks a country (default: device region; 12 countries + "World Tour", `Core/World.swift`).
+Each country has 10 main cities; city N = Infection Level N. In each city Nano clears the 5 organs of **Patient Zero**;
+each organ cures a fifth of the city's infected count, and all 5 save the city and open the next one.
+Cast: Nano, **Dr. Leuko** (white blood cell commander), **King Vex** (virus mastermind) — portraits `dr-leuko`, `king-vex` in `Art/art.py`.
+Scenes (`Core/Story.swift`): chapter intro before each organ's first run, outro on first clear, "clear-1" after the first city,
+an arrival scene per city 2-10 on the map, a finale after city 10, Endless intro. Seen scenes replay from the map's Story journal.
+
 ### Infection Levels (replay)
-Clearing an organ opens its next Infection Level, up to 10 (picker on the Body Map card; "Infection Level N" button on the win screen).
+City N plays every organ at Infection Level N (the city strip on the map selects it; "Next: organ · city" on the win screen).
 Each level above 1: enemy health/damage +40% (of the stage value), speed +3%, spawn rate +7%, elites every 60 s → 30 s min (−3 s/level),
 clear reward +60%, run coins +15%. The map dot shows the highest level cleared. Endless is unaffected.
 

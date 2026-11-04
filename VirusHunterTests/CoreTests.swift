@@ -130,19 +130,45 @@ final class CoreTests: XCTestCase {
         XCTAssertEqual(already, [.weapon(.swarm, toLevel: 1), .heal, .coins(25)])
     }
 
-    func testInfectionLevelsUnlockAfterClears() {
-        var s = SaveData()
+    func testCitiesOpenWhenAllOrgansCleared() {
+        var s = SaveData(); s.unlockedStage = 5
         XCTAssertEqual(s.unlockedInfection(1), 1)
+        XCTAssertEqual(s.currentCity, 1)
         s.recordClear(Organ.all[0])
-        XCTAssertEqual(s.unlockedInfection(1), 2)
+        // City 2 stays closed until every organ of city 1 is cleared.
+        XCTAssertEqual(s.unlockedInfection(1), 1)
+        XCTAssertFalse(s.canPlay(1, level: 2))
+        XCTAssertEqual(s.infected(inCity: 1), Country.outbreakSize(1) * 4 / 5)
+        for o in Organ.all.dropFirst() { s.recordClear(o) }
+        XCTAssertEqual(s.citiesCleared, 1)
+        XCTAssertEqual(s.currentCity, 2)
+        XCTAssertEqual(s.infected(inCity: 1), 0)
+        XCTAssertTrue(s.canPlay(3, level: 2))
+        XCTAssertEqual(s.nextMission, Organ.all[0].at(infection: 2))
         s.recordClear(Organ.all[0].at(infection: 2))
-        XCTAssertEqual(s.clearedInfection(1), 2)
-        XCTAssertEqual(s.unlockedInfection(1), 3)
-        s.recordClear(Organ.all[0].at(infection: 10))
-        XCTAssertEqual(s.unlockedInfection(1), Organ.maxInfection)
-        // Older saves that only know clearedStages still open Level 2.
-        var old = SaveData(); old.clearedStages = [3]
-        XCTAssertEqual(old.unlockedInfection(3), 2)
+        XCTAssertEqual(s.nextMission, Organ.all[1].at(infection: 2))
+        // Older saves that only know clearedStages keep their progress.
+        var old = SaveData(); old.clearedStages = [1, 2, 3, 4, 5]; old.unlockedStage = 5
+        XCTAssertEqual(old.currentCity, 2)
+    }
+
+    func testCountriesHaveTenCities() {
+        for c in Country.all { XCTAssertEqual(c.cities.count, Organ.maxInfection, c.name) }
+        XCTAssertEqual(Country.find("pk").name, "Pakistan")
+        XCTAssertEqual(Country.find("XX"), Country.world)
+    }
+
+    func testStoryScenesFollowProgress() {
+        var before = SaveData(); before.countryCode = "PK"; before.unlockedStage = 5
+        for o in Organ.all.dropLast() { before.recordClear(o) }
+        var after = before; after.recordClear(Organ.all[4])
+        let s = Story.afterWin(Organ.all[4], before: before, after: after)
+        XCTAssertEqual(s?.id, "clear-1")
+        XCTAssertTrue(s?.lines.contains { $0.text.contains("Islamabad") } ?? false)
+        XCTAssertTrue(s?.lines.contains { $0.text.contains("Lahore") } ?? false)
+        XCTAssertEqual(Story.mapScene(save: after)?.id, "city-2")
+        XCTAssertNil(Story.intro(for: Organ.all[0].at(infection: 2), save: after))
+        for sc in Story.scenes { XCTAssertFalse(sc.lines.isEmpty) }
     }
 
     func testInfectionLevelScalesDifficultyAndCoins() {
