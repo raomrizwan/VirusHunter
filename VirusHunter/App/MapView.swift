@@ -203,6 +203,10 @@ struct MapView: View {
                     .lineLimit(1).minimumScaleFactor(0.7)
                 Text(o.name).font(Theme.title(26)).foregroundStyle(.white)
                 Text("Boss: \(bossSetup.title)").font(Theme.body(14)).foregroundStyle(Theme.muted)
+                let mode = o.mode(country: model.save.country.id)
+                if mode != .normal {
+                    Label(mode.title, systemImage: mode.symbol).font(Theme.body(13, .heavy)).foregroundStyle(Theme.gold)
+                }
                 if o.infection > 1 {
                     Text("Viruses +\(Int((o.difficulty / o.at(infection: 1).difficulty - 1) * 100))% stronger · \(String(format: "%.1f", Double(o.coinReward) / Double(o.at(infection: 1).coinReward)))x coins")
                         .font(Theme.body(12, .medium)).foregroundStyle(Theme.muted).lineLimit(1).minimumScaleFactor(0.7)

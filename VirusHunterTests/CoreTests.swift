@@ -381,4 +381,72 @@ final class CoreTests: XCTestCase {
         XCTAssertEqual(first?.id, "outro-1")
         XCTAssertTrue(first?.lines.contains { $0.text.contains("Vaccine 1 of 5") } ?? false)
     }
+
+    func testPediaCoversEveryCharacterOnce() {
+        XCTAssertEqual(Pedia.all.count, 99)
+        XCTAssertEqual(Pedia.ids.count, Pedia.all.count, "card ids are unique")
+        XCTAssertTrue(Pedia.ids.contains("virus-spiky-horned"))
+        XCTAssertTrue(Pedia.ids.contains("boss-sumo-frost"))
+        XCTAssertTrue(Pedia.ids.contains("miniboss-magnet"))
+        XCTAssertTrue(Pedia.ids.contains("king-vex"))
+        XCTAssertTrue(Pedia.all.allSatisfy { !$0.name.isEmpty && !$0.line.isEmpty })
+        // Every boss a city can throw at you has a card.
+        for lv in 1...10 { for o in Organ.all { XCTAssertNotNil(Pedia.entry(o.at(infection: lv).bossSetup(country: "PK").texture)) } }
+    }
+
+    func testAlliesRecruitAndPick() {
+        var s = SaveData()
+        XCTAssertNil(s.ally)
+        XCTAssertFalse(s.ownsAlly(.medic))
+        XCTAssertFalse(s.recruitAlly(.medic), "the Medic joins only after a city is saved")
+        s.coins = 3_000
+        XCTAssertTrue(s.recruitAlly(.guardian))
+        XCTAssertEqual(s.coins, 500)
+        XCTAssertEqual(s.ally, .guardian)
+        XCTAssertFalse(s.recruitAlly(.hunter))
+        for o in Organ.all { s.recordClear(o) }
+        XCTAssertTrue(s.ownsAlly(.medic))
+        XCTAssertTrue(s.recruitAlly(.medic))
+        XCTAssertEqual(s.coins, 500, "picking an owned ally is free")
+        XCTAssertEqual(s.ally, .medic)
+    }
+
+    func testSpecialMissionsPerCity() {
+        for o in Organ.all { XCTAssertEqual(o.mode(country: "PK"), .normal, "city 1 is classic") }
+        for lv in 2...9 {
+            let modes = Organ.all.map { $0.at(infection: lv).mode(country: "PK") }
+            XCTAssertEqual(modes.filter { $0 == .defense }.count, 1, "city \(lv)")
+            XCTAssertEqual(modes.filter { $0 == .escape }.count, lv >= 3 ? 1 : 0, "city \(lv)")
+        }
+        XCTAssertEqual(Organ.all[4].at(infection: 10).mode(country: "PK"), .normal, "King Vex's fight stays a normal run")
+        XCTAssertEqual(Organ.endless.mode(country: "PK"), .normal)
+        XCTAssertEqual(Organ.bossRush.mode(country: "PK"), .normal)
+    }
+
+    func testBossRushIsWeeklyAndNeverCountsTowardCities() {
+        let a = BossRush.lineup(week: "2026-W45"), b = BossRush.lineup(week: "2026-W46")
+        XCTAssertEqual(a.count, BossRush.bosses)
+        XCTAssertEqual(Set(a.map(\.kind)).count, 5)
+        XCTAssertEqual(a, BossRush.lineup(week: "2026-W45"))
+        XCTAssertNotEqual(a, b)
+        XCTAssertFalse(a.contains { $0.variant == .normal })
+        var s = SaveData(); s.recordClear(.bossRush)
+        XCTAssertTrue(s.clearedStages.isEmpty)
+        XCTAssertEqual(Organ.bossRush.coinReward, 0)
+        XCTAssertNil(Story.afterWin(.bossRush, before: SaveData(), after: s))
+        XCTAssertFalse(SaveData().bossRushUnlocked)
+        let d = DateComponents(calendar: Calendar(identifier: .gregorian), timeZone: TimeZone(identifier: "UTC"), year: 2026, month: 11, day: 4, hour: 12).date!
+        XCTAssertEqual(BossRush.week(d), "2026-W45")
+    }
+
+    func testComboRewardsAndOldSavesDecode() throws {
+        XCTAssertNil(Combo.reward(at: 24))
+        XCTAssertEqual(Combo.reward(at: 25), 5)
+        XCTAssertEqual(Combo.reward(at: 400), 80)
+        let old = try JSONDecoder().decode(SaveData.self, from: Data(#"{"coins": 42}"#.utf8))
+        XCTAssertEqual(old.coins, 42)
+        XCTAssertTrue(old.discovered.isEmpty)
+        XCTAssertNil(old.allyID)
+        XCTAssertEqual(old.bestCombo, 0)
+    }
 }

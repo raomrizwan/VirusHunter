@@ -67,7 +67,7 @@ struct HomeView: View {
                     .buttonStyle(PressStyle())
                     .offset(y: float ? -10 : 8)
                 }
-                .frame(height: 300)
+                .frame(height: 270)
                 .frame(maxWidth: .infinity)
                 .overlay(alignment: .bottomTrailing) {
                     Button { model.go(.skins) } label: {
@@ -107,6 +107,16 @@ struct HomeView: View {
                             }
                         }
                     }
+                    HStack(spacing: 10) {
+                        smallButton("Pedia", "book.fill", Theme.cyan, badge: "\(model.save.discovered.count)") { model.go(.pedia) }
+                            .accessibilityIdentifier("pediaButton")
+                        smallButton("Allies", "person.2.fill", Theme.lime, badge: nil) { model.go(.allies) }
+                            .accessibilityIdentifier("alliesButton")
+                        smallButton("Boss Rush", "flame.fill", Theme.red, badge: model.save.bossRushUnlocked ? nil : "🔒") {
+                            if model.save.bossRushUnlocked { model.play(.bossRush) }
+                        }
+                        .accessibilityIdentifier("bossRushButton")
+                    }
                     if !model.save.endlessUnlocked {
                         Text("Clear the Heart to unlock Endless").font(Theme.body(13)).foregroundStyle(Theme.muted)
                     } else if model.save.bestEndless > 0 {
@@ -118,6 +128,23 @@ struct HomeView: View {
                 BannerAdView()
             }
         }
+    }
+
+    private func smallButton(_ title: String, _ icon: String, _ color: Color, badge: String?, _ action: @escaping () -> Void) -> some View {
+        Button { Sound.tap.play(); Haptics.light(); action() } label: {
+            VStack(spacing: 3) {
+                Image(systemName: icon).font(.system(size: 18, weight: .bold)).foregroundStyle(color)
+                Text(title).font(Theme.body(12, .heavy)).foregroundStyle(.white).lineLimit(1).minimumScaleFactor(0.7)
+            }
+            .frame(maxWidth: .infinity).frame(height: 54).glass(14)
+            .overlay(alignment: .topTrailing) {
+                if let badge {
+                    Text(badge).font(Theme.body(10, .black)).foregroundStyle(.white)
+                        .padding(.horizontal, 5).frame(minWidth: 20, minHeight: 20).background(Capsule().fill(Theme.magenta.opacity(0.85))).offset(x: 4, y: -6)
+                }
+            }
+        }
+        .buttonStyle(PressStyle())
     }
 
     private func toggle(_ icon: String, _ action: @escaping () -> Void) -> some View {

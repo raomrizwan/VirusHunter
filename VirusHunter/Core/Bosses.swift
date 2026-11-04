@@ -67,7 +67,7 @@ private func citySeed(_ country: String, _ level: Int, salt: UInt64) -> SeededRN
 extension Organ {
     /// The boss this organ's run ends with, and its variant, for a country.
     func bossSetup(country: String) -> BossSetup {
-        if isEndless { return BossSetup(kind: boss, variant: .normal) }
+        if isSideMode { return BossSetup(kind: boss, variant: .normal) }
         if finalBoss == .bossVex { return BossSetup(kind: .bossVex, variant: .normal) }
         guard infection >= 2 else { return BossSetup(kind: boss, variant: .normal) }
         var rng = citySeed(country, infection, salt: 7_919)
@@ -91,7 +91,7 @@ extension Organ {
     /// Special viruses joining this run's mix, signature first: Bone Marrow and later cities
     /// add guests picked per country and city.
     func extraKinds(country: String) -> [EnemyKind] {
-        if isEndless { return EnemyKind.specials }
+        if isSideMode { return EnemyKind.specials }
         var out: [EnemyKind] = signature.map { [$0] } ?? []
         var rng = citySeed(country, infection, salt: 104_729 &+ UInt64(id))
         let guests = EnemyKind.specials.filter { !out.contains($0) }.shuffled(using: &rng)
@@ -144,7 +144,7 @@ extension EnemyKind {
 }
 
 extension Organ {
-    func strain(country: String) -> VirusStrain? { isEndless ? nil : VirusStrain.forCity(infection, country: country) }
+    func strain(country: String) -> VirusStrain? { isSideMode ? nil : VirusStrain.forCity(infection, country: country) }
 
     /// The mini boss that shows up mid-run (a different one per organ and city).
     func miniBoss(country: String) -> EnemyKind {
@@ -153,5 +153,5 @@ extension Organ {
     }
 
     /// Arena background: even cities use the organ's second, more infected look.
-    var backdrop: String { !isEndless && infection % 2 == 0 ? "bg-\(key)-2" : "bg-\(key)" }
+    var backdrop: String { !isSideMode && infection % 2 == 0 ? "bg-\(key)-2" : "bg-\(key)" }
 }

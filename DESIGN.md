@@ -88,6 +88,13 @@ an arrival scene per city 2-10 on the map, a finale after city 10, Endless intro
 - **Backgrounds:** each organ has its own motif (alveoli, blood cells, villi, neurons, bone lattice) and a second infected palette used on even cities (`bg-<organ>-2`), plus drifting parallax cells.
 - **Vaccine report:** after every new organ clear Dr. Leuko says what it added to the vaccine and how many people are recovering ("Vaccine 2 of 5"); the fifth clear announces the vaccine and the saved city.
 
+### Virus-pedia, allies, missions, combos, Boss Rush
+- **Virus-pedia** (`Core/Pedia.swift`, `PediaView`): 99 cards (10 viruses, 54 strain looks, 4 mini bosses, 6 bosses, 25 boss variants). A card unlocks the first time the character spawns in a run; +10 coins per new card.
+- **Allies** (`Core/Allies.swift`, `AlliesView`): Medic Cell (free after the first city, heals 6% every 5 s), Guardian Cell (2,500: clears nearby shots and pushes viruses every 3 s), Hunter Cell (4,000: zaps the nearest virus every 0.8 s). One flies with Nano.
+- **Special missions** (`Core/Modes.swift`): from city 2 one organ per city is **Hospital Defense** (60% of viruses go for Patient Zero's bed; bed at 0% = defeat; boss at 2:30), from city 3 another is **Escape** (exit 2,400 away with an edge arrow; no boss, more viruses). King Vex's fight stays normal.
+- **Combos:** kills within 1.5 s chain; x25/50/100/200/400 pay 5/10/20/40/80 coins. Boss kills trigger a slow-motion knockout with a camera punch-in.
+- **Weekly Boss Rush** (unlocks after the first city): five variant bosses back to back from an ISO-week seeded lineup, four free upgrades at the start; 400 coins for the week's first win, 100 after. Leaderboard `vh.leaderboard.bossrush` (seconds, **lower is better** — set it that way in App Store Connect).
+
 ### City rewards (kept secret until earned)
 City 1: 1,250 coins · 2: **Freeze Ray** weapon (frost wave, slows; evolves with DNA Magnet into Absolute Zero) · 3: **Frost Nano** skin ·
 4: **Homing Missiles** weapon (steer + explode; evolves with Overcharge into Rocket Storm) · 5: **Plasma Nano** skin ·

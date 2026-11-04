@@ -93,15 +93,32 @@ struct GameContent: View {
         if s.citiesCleared > before.citiesCleared, case .coins(let n) = CityReward.forCity(s.citiesCleared) { s.coins += n }
         let scene = won ? Story.afterWin(organ, before: model.save, after: s) : nil
         if organ.isEndless { s.bestEndless = max(s.bestEndless, r.time) }
+        // Virus-pedia: new cards pay a few coins each.
+        let newCards = holder.scene.seen.intersection(Pedia.ids).subtracting(s.discovered)
+        s.discovered.formUnion(newCards)
+        s.coins += newCards.count * Pedia.coinsPerCard
+        s.bestCombo = max(s.bestCombo, r.combo)
+        var rushLine: String?
+        if organ.isBossRush, won {
+            let week = BossRush.week()
+            let first = s.bossRushBests[week] == nil
+            s.bossRushBests[week] = min(s.bossRushBests[week] ?? .infinity, r.time)
+            let bonus = first ? BossRush.firstWinReward : BossRush.replayReward
+            s.coins += bonus
+            rushLine = "Boss Rush beaten in \(timeString(r.time))! +\(bonus) coins"
+        }
         s.goldenCaught += r.golden
         if holder.state.loadout.weapons.values.contains(where: { $0 >= evolvedLevel }) { s.everEvolved = true }
         s.daily.refresh()
-        s.daily.record(RunReport(kills: r.kills, bosses: r.bosses, cleared: won && !organ.isEndless, seconds: r.time,
+        s.daily.record(RunReport(kills: r.kills, bosses: r.bosses, cleared: won && !organ.isSideMode, seconds: r.time,
                                  coins: r.coins, level: r.level, endless: organ.isEndless))
         model.save = s
         model.persist()
         GameCenter.sync(s)
         unlocks = newUnlocks(before: before, after: s)
+        if let rushLine { unlocks.insert(rushLine, at: 0) }
+        if !newCards.isEmpty { unlocks.append("📖 \(newCards.count) new Virus-pedia card\(newCards.count == 1 ? "" : "s") (+\(newCards.count * Pedia.coinsPerCard) coins)") }
+        if s.citiesCleared >= 1, before.citiesCleared == 0 { unlocks.append("Medic Cell ally and Boss Rush unlocked") }
         reward = (coins, false)
         if let scene { DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { model.showStory(scene) } }
     }
@@ -111,7 +128,7 @@ struct GameContent: View {
         var out: [String] = []
         if after.unlockedStage > before.unlockedStage { out.append("\(Organ.all[after.unlockedStage - 1].name) unlocked") }
         if after.endlessUnlocked && !before.endlessUnlocked { out.append("Endless mode unlocked") }
-        if !organ.isEndless {
+        if !organ.isSideMode {
             let cured = before.infected(inCity: organ.infection) - after.infected(inCity: organ.infection)
             if cured > 0 { out.append("\(cured.formatted()) people cured in \(after.country.city(organ.infection))") }
         }
@@ -140,7 +157,7 @@ struct GameContent: View {
     }
 
     private func leave() {
-        InterstitialController.shared.showIfAllowed(gamesPlayed: model.save.runs) { model.go(organ.isEndless ? .home : .map) }
+        InterstitialController.shared.showIfAllowed(gamesPlayed: model.save.runs) { model.go(organ.isSideMode ? .home : .map) }
     }
 
     /// The next organ to clear in the active city (or the first one in the next city).
@@ -192,6 +209,11 @@ struct HUD: View {
                     }
                 }
                 Spacer()
+                if state.combo >= 10 {
+                    Text("COMBO x\(state.combo)").font(Theme.title(16)).foregroundStyle(Theme.gold)
+                        .shadow(color: Theme.gold.opacity(0.7), radius: 6)
+                        .accessibilityIdentifier("combo")
+                }
                 if let o = state.objective {
                     Label(o, systemImage: state.objectiveDone ? "checkmark.circle.fill" : "target")
                         .font(Theme.body(11, .heavy)).foregroundStyle(state.objectiveDone ? Theme.lime : Theme.gold)
@@ -385,7 +407,7 @@ struct ResultView: View {
                     .scaleEffect(appear ? 1 : 0.5).rotationEffect(.degrees(appear ? 0 : -20))
                 Text(won ? "\(organ.name.uppercased()) CLEARED!" : organ.isEndless ? "YOU SURVIVED" : "INFECTED!")
                     .font(Theme.title(32)).foregroundStyle(won ? Theme.lime : .white).multilineTextAlignment(.center)
-                if !organ.isEndless {
+                if !organ.isSideMode {
                     Label("\(save.country.city(organ.infection)), \(save.country.name)", systemImage: "mappin.and.ellipse")
                         .font(Theme.body(14, .bold)).foregroundStyle(Theme.muted)
                 }
@@ -411,7 +433,7 @@ struct ResultView: View {
                 if let r = reward, let g = save.nextGoal {
                     GoalCard(goal: g, coins: save.coins, earned: r.coins)
                 }
-                if won && !organ.isEndless, let next = save.nextMission {
+                if won && !organ.isSideMode, let next = save.nextMission {
                     GameButton(title: "Next: \(next.name) · \(save.country.city(next.infection))", icon: "arrow.right", action: onNext)
                         .accessibilityIdentifier("nextButton")
                 }

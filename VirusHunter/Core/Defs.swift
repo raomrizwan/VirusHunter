@@ -304,16 +304,21 @@ struct Organ: Identifiable, Equatable {
         Organ(id: 5, name: "Bone Marrow", key: "marrow", boss: .bossMarrow, tagline: "The source of the swarm."),
     ]
     static let endless = Organ(id: 0, name: "Endless", key: "endless", boss: .bossRoyal, tagline: "How long can you last?")
+    /// Weekly Boss Rush: five bosses back to back.
+    static let bossRush = Organ(id: 6, name: "Boss Rush", key: "endless", boss: .bossSumo, tagline: "Five bosses, back to back.")
 
     var isEndless: Bool { id == 0 }
+    var isBossRush: Bool { id == 6 }
+    /// Endless and Boss Rush are side modes: they never count toward the outbreak.
+    var isSideMode: Bool { isEndless || isBossRush }
     /// The boss actually fought: King Vex waits in the Bone Marrow of the final city.
     var finalBoss: EnemyKind { id == 5 && infection >= Organ.maxInfection ? .bossVex : boss }
     /// This organ at another Infection Level (clamped to 1...maxInfection).
     func at(infection level: Int) -> Organ { var o = self; o.infection = max(1, min(Organ.maxInfection, level)); return o }
     /// Extra steps above Infection Level 1.
-    private var heat: Double { isEndless ? 0 : Double(infection - 1) }
+    private var heat: Double { isSideMode ? 0 : Double(infection - 1) }
     /// Stage difficulty multiplier for enemy health and damage.
-    var difficulty: Double { (isEndless ? 1.4 : 1 + 0.55 * Double(id - 1)) * (1 + 0.4 * heat) }
+    var difficulty: Double { (isEndless ? 1.4 : isBossRush ? 2.2 : 1 + 0.55 * Double(id - 1)) * (1 + 0.4 * heat) }
     /// Enemy speed multiplier from Infection Level.
     var speedScale: Double { 1 + 0.03 * heat }
     /// Spawn rate multiplier from Infection Level.
@@ -322,7 +327,7 @@ struct Organ: Identifiable, Equatable {
     var eliteInterval: Double { max(30, 60 - 3 * heat) }
     /// Seconds until the boss appears.
     var bossTime: Double { isEndless ? 180 : 240 }
-    var coinReward: Int { isEndless ? 0 : Int(Double(60 + 30 * id) * (1 + 0.6 * heat)) }
+    var coinReward: Int { isSideMode ? 0 : Int(Double(60 + 30 * id) * (1 + 0.6 * heat)) }
     /// Multiplier on coins picked up and earned from kills.
     var coinScale: Double { 1 + 0.15 * heat }
 }
@@ -331,7 +336,7 @@ struct Organ: Identifiable, Equatable {
 enum Spawner {
     /// Enemies per second.
     static func rate(time t: Double, organ: Organ) -> Double {
-        let stage = organ.isEndless ? 3 : organ.id
+        let stage = organ.isEndless ? 3 : organ.isBossRush ? 1 : organ.id
         let base = 1.5 + 0.2 * Double(stage - 1)
         let warmup = min(1, 0.55 + t / 45) // gentler first ~20 s
         return min(18 * organ.spawnScale, base * (1 + t / 32) * warmup * organ.spawnScale)

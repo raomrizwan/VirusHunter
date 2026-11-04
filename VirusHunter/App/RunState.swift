@@ -29,6 +29,8 @@ final class RunState: ObservableObject {
     /// Bonus objective for this run (shown under the weapons), and whether it's done.
     @Published var objective: String?
     @Published var objectiveDone = false
+    /// Kills in a row (shown from 10 up).
+    @Published var combo = 0
 
     /// Set by the scene; the HUD calls these.
     var onChoose: ((UpgradeOption) -> Void)?

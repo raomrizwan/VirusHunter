@@ -75,6 +75,11 @@ struct SaveData: Codable, Equatable {
     var bestStreak = 0                          // longest login streak
     var dailyBonuses = 0                        // times all three daily missions were finished
     var goldenCaught = 0                        // Golden Viruses caught
+    var discovered: Set<String> = []            // Virus-pedia cards unlocked (texture names)
+    var ownedAllies: Set<String> = []           // recruited allies
+    var allyID: String?                         // ally flying with Nano
+    var bossRushBests: [String: Double] = [:]   // week -> best Boss Rush time
+    var bestCombo = 0
 
     func level(_ t: TechKind) -> Int { tech[t.rawValue] ?? 0 }
     func rank(_ t: TechKind) -> Int { ranks[t.rawValue] ?? 0 }
@@ -108,7 +113,7 @@ struct SaveData: Codable, Equatable {
     }
 
     mutating func recordClear(_ o: Organ) {
-        guard !o.isEndless else { return }
+        guard !o.isSideMode else { return }
         clearedStages.insert(o.id)
         unlockedStage = max(unlockedStage, min(5, o.id + 1))
         infectionCleared[String(o.id)] = max(clearedInfection(o.id), o.infection)
@@ -144,6 +149,11 @@ extension SaveData {
         bestStreak = try c.decodeIfPresent(Int.self, forKey: .bestStreak) ?? d.bestStreak
         dailyBonuses = try c.decodeIfPresent(Int.self, forKey: .dailyBonuses) ?? d.dailyBonuses
         goldenCaught = try c.decodeIfPresent(Int.self, forKey: .goldenCaught) ?? d.goldenCaught
+        discovered = try c.decodeIfPresent(Set<String>.self, forKey: .discovered) ?? d.discovered
+        ownedAllies = try c.decodeIfPresent(Set<String>.self, forKey: .ownedAllies) ?? d.ownedAllies
+        allyID = try c.decodeIfPresent(String.self, forKey: .allyID)
+        bossRushBests = try c.decodeIfPresent([String: Double].self, forKey: .bossRushBests) ?? d.bossRushBests
+        bestCombo = try c.decodeIfPresent(Int.self, forKey: .bestCombo) ?? d.bestCombo
     }
 }
 

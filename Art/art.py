@@ -475,6 +475,58 @@ def mini_boss(name, size=384):
     return add_layers(svg, back, front)
 
 
+# ---------------------------------------------------------------- allies + mission props
+def ally(name, size=256):
+    """Dr. Leuko's white blood cell helpers: a friendly round cell with a role badge."""
+    c = size / 2
+    r = size * 0.3
+    accent = {"medic": "#FF4D6A", "guardian": "#4FA8FF", "hunter": "#7CFF5A"}[name]
+    defs = f'''<radialGradient id="wb{name}" cx="36%" cy="30%" r="80%"><stop offset="0" stop-color="#FFFFFF"/><stop offset=".6" stop-color="#E4E8FF"/><stop offset="1" stop-color="#9AA2D8"/></radialGradient>
+    <filter id="wg{name}" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="{size*0.04}"/></filter>'''
+    p = [f'<circle cx="{c}" cy="{c}" r="{r*1.2}" fill="{accent}" opacity=".35" filter="url(#wg{name})"/>']
+    # soft wobbly membrane bumps
+    for i in range(10):
+        a = 2 * math.pi * i / 10
+        p.append(f'<circle cx="{c+math.cos(a)*r*0.92}" cy="{c+math.sin(a)*r*0.92}" r="{r*0.28}" fill="url(#wb{name})" stroke="#7A82B8" stroke-width="{size*0.01}"/>')
+    p.append(f'<circle cx="{c}" cy="{c}" r="{r}" fill="url(#wb{name})" stroke="#7A82B8" stroke-width="{size*0.014}"/>')
+    # friendly face
+    ey, ex, er = c - r * 0.1, r * 0.34, r * 0.19
+    for sx in (-1, 1):
+        p.append(f'<ellipse cx="{c+sx*ex}" cy="{ey}" rx="{er*0.8}" ry="{er}" fill="#1A1A3A"/><circle cx="{c+sx*ex-er*0.25}" cy="{ey-er*0.35}" r="{er*0.3}" fill="#fff"/>')
+        p.append(f'<ellipse cx="{c+sx*r*0.58}" cy="{c+r*0.2}" rx="{r*0.13}" ry="{r*0.08}" fill="#FF8AA8" opacity=".6"/>')
+    p.append(f'<path d="M{c-r*0.25} {c+r*0.3} Q{c} {c+r*0.55} {c+r*0.25} {c+r*0.3}" stroke="#1A1A3A" stroke-width="{size*0.02}" fill="none" stroke-linecap="round"/>')
+    if name == "medic":
+        p.append(f'<path d="M{c-r*0.55} {c-r*0.62} Q{c} {c-r*1.25} {c+r*0.55} {c-r*0.62} Z" fill="#fff" stroke="#C8CCE8" stroke-width="{size*0.01}"/>')
+        k = r * 0.13
+        p.append(f'<path d="M{c-k*1.4} {c-r*0.82} H{c+k*1.4} M{c} {c-r*0.82-k*1.4} V{c-r*0.82+k*1.4}" stroke="{accent}" stroke-width="{k*0.9}" stroke-linecap="round"/>')
+    elif name == "guardian":
+        x, y = c + r * 0.75, c + r * 0.45
+        p.append(f'<path d="M{x-r*0.38} {y-r*0.38} H{x+r*0.38} V{y+r*0.05} Q{x+r*0.38} {y+r*0.42} {x} {y+r*0.55} Q{x-r*0.38} {y+r*0.42} {x-r*0.38} {y+r*0.05} Z" fill="{accent}" stroke="#1A4A8A" stroke-width="{size*0.014}"/>')
+        p.append(f'<path d="M{x} {y-r*0.25} V{y+r*0.35}" stroke="#fff" stroke-width="{size*0.014}"/>')
+        p.append(f'<path d="M{c-r*0.6} {c-r*0.75} Q{c} {c-r*1.2} {c+r*0.6} {c-r*0.75}" stroke="{accent}" stroke-width="{size*0.03}" fill="none" stroke-linecap="round"/>')
+    else:
+        p.append(f'<rect x="{c-r*0.72}" y="{ey-er*0.9}" width="{r*1.44}" height="{er*1.8}" rx="{er*0.8}" fill="{accent}" opacity=".55" stroke="#1F6A10" stroke-width="{size*0.01}"/>')
+        x, y = c + r * 0.8, c - r * 0.75
+        p.append(f'<circle cx="{x}" cy="{y}" r="{r*0.22}" fill="none" stroke="{accent}" stroke-width="{size*0.014}"/><path d="M{x-r*0.32} {y} H{x+r*0.32} M{x} {y-r*0.32} V{y+r*0.32}" stroke="{accent}" stroke-width="{size*0.01}"/>')
+    return wrap("".join(p), size, size, defs)
+
+
+def bed(size=256):
+    """Patient Zero's hospital bed for Hospital Defense (seen from above)."""
+    c = size / 2
+    p = [f'<ellipse cx="{c}" cy="{c+8}" rx="{size*0.42}" ry="{size*0.46}" fill="#3FFF9A" opacity=".18"/>']
+    p.append(f'<rect x="{c-62}" y="{c-100}" width="124" height="200" rx="16" fill="#C8D0E0" stroke="#5A6680" stroke-width="6"/>')
+    p.append(f'<rect x="{c-54}" y="{c-92}" width="108" height="184" rx="12" fill="#F4F7FF"/>')
+    p.append(f'<rect x="{c-40}" y="{c-86}" width="80" height="34" rx="12" fill="#FFFFFF" stroke="#C8D0E0" stroke-width="3"/>')
+    p.append(f'<circle cx="{c}" cy="{c-50}" r="24" fill="#B8E6A0" stroke="#5A8A40" stroke-width="4"/>')
+    p.append(f'<circle cx="{c-8}" cy="{c-54}" r="3.5" fill="#2A3A20"/><circle cx="{c+8}" cy="{c-54}" r="3.5" fill="#2A3A20"/><path d="M{c-8} {c-40} Q{c} {c-45} {c+8} {c-40}" stroke="#2A3A20" stroke-width="3" fill="none"/>')
+    p.append(f'<rect x="{c-54}" y="{c-26}" width="108" height="118" rx="10" fill="#7FC8FF" stroke="#3A78B0" stroke-width="4"/>')
+    p.append(f'<path d="M{c-54} {c-8} H{c+54}" stroke="#FFFFFF" stroke-width="8"/>')
+    k = 12
+    p.append(f'<circle cx="{c+44}" cy="{c+78}" r="18" fill="#fff" stroke="#E0303A" stroke-width="3"/><path d="M{c+44-k} {c+78} H{c+44+k} M{c+44} {c+78-k} V{c+78+k}" stroke="#E0303A" stroke-width="6"/>')
+    return wrap("".join(p), size, size)
+
+
 # ---------------------------------------------------------------- pickups / fx
 def orb(size=96, color="#3FE6FF", core="#E8FFFF"):
     defs = f'''<radialGradient id="o" cx="40%" cy="35%" r="70%"><stop offset="0" stop-color="{core}"/><stop offset=".6" stop-color="{color}"/><stop offset="1" stop-color="{color}" stop-opacity=".2"/></radialGradient>
@@ -782,6 +834,9 @@ if __name__ == "__main__":
             items.append((f"virus-{k}-{st}", strain_virus(k, st)))
     for m in MINI_BOSSES:
         items.append((f"miniboss-{m}", mini_boss(m)))
+    for a in ["medic", "guardian", "hunter"]:
+        items.append((f"ally-{a}", ally(a)))
+    items.append(("bed", bed()))
     items += [("orb", orb()), ("orb-big", orb(96, "#FFE45C", "#FFFFE0")), ("coin", coin()), ("heart", heart()), ("chest", chest()),
               ("glow", glow()), ("glow-pink", glow(128, "#FF6BD5")), ("glow-gold", glow(128, "#FFE45C")), ("bolt", bolt()), ("bomb", bomb()), ("slime", slime())]
     for o in ORGANS:

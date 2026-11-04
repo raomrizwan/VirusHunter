@@ -87,6 +87,6 @@ enum CityMutation: String, CaseIterable {
 extension Organ {
     /// The mutation this run plays with (Endless has none).
     func mutation(country: String) -> CityMutation {
-        isEndless ? .none : CityMutation.forCity(infection, country: country)
+        isSideMode ? .none : CityMutation.forCity(infection, country: country)
     }
 }

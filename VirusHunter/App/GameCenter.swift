@@ -9,6 +9,7 @@ enum GameCenter {
         case endless = "vh.leaderboard.endless"       // best Endless time, seconds
         case cities = "vh.leaderboard.cities"         // cities saved
         case kills = "vh.leaderboard.kills"           // total viruses destroyed
+        case bossRush = "vh.leaderboard.bossrush"     // this week's best Boss Rush time, seconds (lower is better)
     }
 
     static var enabled: Bool { GKLocalPlayer.local.isAuthenticated && !AppModel.uiTesting }
@@ -24,7 +25,8 @@ enum GameCenter {
     /// Sends what the save shows so far: scores only ever go up, so resending is harmless.
     static func sync(_ save: SaveData) {
         guard enabled else { return }
-        let scores: [(Board, Int)] = [(.endless, Int(save.bestEndless)), (.cities, save.citiesCleared), (.kills, save.totalKills)]
+        var scores: [(Board, Int)] = [(.endless, Int(save.bestEndless)), (.cities, save.citiesCleared), (.kills, save.totalKills)]
+        if let rush = save.bossRushBest() { scores.append((.bossRush, Int(rush.rounded(.up)))) }
         for (b, v) in scores where v > 0 {
             GKLeaderboard.submitScore(v, context: 0, player: GKLocalPlayer.local, leaderboardIDs: [b.rawValue]) { _ in }
         }

@@ -199,7 +199,7 @@ enum Story {
 
     /// Shown after a won run: a saved city (first city / whole country), else the organ's first-clear outro.
     static func afterWin(_ organ: Organ, before: SaveData, after: SaveData) -> StoryScene? {
-        guard !organ.isEndless else { return nil }
+        guard !organ.isSideMode else { return nil }
         let country = after.country
         if after.citiesCleared > before.citiesCleared {
             if after.citiesCleared >= Organ.maxInfection, !after.seenStory.contains("finale"), let s = scene("finale") {
