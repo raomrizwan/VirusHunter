@@ -69,8 +69,11 @@ enum GameCenter {
         return top
     }
 
-    @MainActor private final class Dismisser: NSObject, GKGameCenterControllerDelegate {
+    private final class Dismisser: NSObject, GKGameCenterControllerDelegate {
         static let shared = Dismisser()
-        func gameCenterViewControllerDidFinish(_ vc: GKGameCenterViewController) { vc.dismiss(animated: true) }
+        // GameKit calls this on the main thread.
+        nonisolated func gameCenterViewControllerDidFinish(_ vc: GKGameCenterViewController) {
+            MainActor.assumeIsolated { vc.dismiss(animated: true) }
+        }
     }
 }
