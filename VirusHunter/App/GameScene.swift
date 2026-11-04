@@ -202,6 +202,25 @@ final class GameScene: SKScene {
     private var chestsOpened = 0
     private var objectiveDone = false
     private weak var boss: Enemy?
+    // Pet
+    private let pet: Pet?
+    private let petLevel: Int
+    private let petNode = SKSpriteNode()
+    private var petPos = CGPoint.zero
+    private var petT = 2.0
+    private var bubbleUp = false
+    private var bubbleNode: SKSpriteNode?
+    // Nemesis: the boss that last beat Nano comes back mid-run
+    private let nemesis: Nemesis?
+    private var nemesisSpawned = false
+    private weak var nemesisEnemy: Enemy?
+    private(set) var nemesisBeaten = false
+    // Ghost of the best clear, and this run's recording
+    private let ghost: Ghost?
+    private let ghostNode = SKSpriteNode()
+    private var ghostGone = false
+    private var recXs: [Float] = [], recYs: [Float] = []
+    private var recT = 0.0
     private var bossDefeated = false
     private var simPaused = false
     private var over = false
@@ -245,6 +264,10 @@ final class GameScene: SKScene {
         self.strain = state.organ.strain(country: save.country.id)
         self.miniKind = state.organ.miniBoss(country: save.country.id)
         self.ally = save.ally
+        self.pet = save.pet
+        self.petLevel = save.pet.map { save.petLevel($0) } ?? 1
+        self.nemesis = save.nemesisHunts(state.organ) ? save.nemesis : nil
+        self.ghost = state.organ.isSideMode ? nil : GhostStore.load(GhostStore.key(country: save.country.id, organ: state.organ.id))
         self.mode = state.organ.mode(country: save.country.id)
         self.rushLineup = BossRush.lineup(week: BossRush.week())
         self.nextElite = mutation.eliteInterval ?? state.organ.eliteInterval
@@ -322,6 +345,8 @@ final class GameScene: SKScene {
         for _ in 0..<6 { spawn(.spiky) }
         setupDarkness()
         setupAlly()
+        setupPet()
+        setupGhost()
         setupMode()
         if state.organ.isBossRush {
             // Boss Rush starts with four upgrades, so Nano isn't facing five bosses at level 1.
@@ -425,6 +450,9 @@ final class GameScene: SKScene {
         updatePickups(dt)
         updatePuddles(dt)
         updateAlly(dt)
+        updatePet(dt)
+        updateGhost(dt)
+        updateNemesis()
         updateMode(dt)
         updateHazards(dt)
         updateObjective()
@@ -1460,7 +1488,16 @@ final class GameScene: SKScene {
             dnaEarned += e.kind.dnaDrop
             popLabel("+\(e.kind.dnaDrop) BOSS DNA", color: UIColor(red: 0.5, green: 1, blue: 0.8, alpha: 1))
         }
-        if e.kind.isBoss {
+        if e === nemesisEnemy {
+            // Swept away by the end-of-run cure wave doesn't count as revenge.
+            if !bossDefeated {
+                nemesisBeaten = true
+                for _ in 0..<10 { drop(.coin(3), at: jitter(e.pos, 60)) }
+                drop(.chest, at: e.pos)
+                knockout(at: e.pos)
+                state.flash("REVENGE! NEMESIS DOWN", seconds: 2)
+            }
+        } else if e.kind.isBoss {
             bossKills += 1
             for _ in 0..<14 { drop(.coin(3), at: jitter(e.pos, 70)) }
             drop(.chest, at: e.pos)
@@ -1468,7 +1505,7 @@ final class GameScene: SKScene {
             shake = 0.6
             Haptics.success()
             knockout(at: e.pos)
-            let otherBoss = enemies.first { $0.alive && $0.kind.isBoss && $0 !== e }
+            let otherBoss = enemies.first { $0.alive && $0.kind.isBoss && $0 !== e && $0 !== self.nemesisEnemy }
             if state.organ.isBossRush, rushIndex < BossRush.bosses - 1 {
                 rushIndex += 1; boss = nil; nextBoss = time + 3
                 state.flash("BOSS \(rushIndex)/\(BossRush.bosses) DOWN! NEXT ONE...", seconds: 2)
@@ -1592,6 +1629,13 @@ final class GameScene: SKScene {
 
     private func hurt(_ amount: Double) {
         guard invuln <= 0, !over else { return }
+        if bubbleUp {
+            // Bloop's bubble takes the hit.
+            bubbleUp = false; invuln = 0.6
+            if let b = bubbleNode { bubbleNode = nil; b.run(.sequence([.group([.scale(to: 1.6, duration: 0.2), .fadeOut(withDuration: 0.2)]), .removeFromParent()])) }
+            Sound.coin.play(volume: 0.5)
+            return
+        }
         invuln = 0.6
         lastHit = time
         if !god { hp -= amount * (1 - stats.armor) }
@@ -2130,6 +2174,111 @@ final class GameScene: SKScene {
             lightning([allyPos, t.pos])
             damage(t, 14 * stats.damage, knock: norm(sub(t.pos, allyPos)), kb: 80, quiet: true)
         }
+    }
+
+    // MARK: pet, ghost, nemesis
+
+    private func setupPet() {
+        guard let pet else { return }
+        petNode.texture = tex(pet.texture)
+        petNode.size = CGSize(width: 36, height: 36); petNode.zPosition = 5
+        petPos = CGPoint(x: ppos.x + 40, y: ppos.y - 30)
+        world.addChild(petNode)
+        petNode.run(.repeatForever(.sequence([.moveBy(x: 0, y: 3, duration: 0.3), .moveBy(x: 0, y: -3, duration: 0.3)])))
+    }
+
+    private func updatePet(_ dt: Double) {
+        guard let pet else { return }
+        let side: CGFloat = player.xScale < 0 ? -40 : 40
+        let target = CGPoint(x: ppos.x + side, y: ppos.y - 32)
+        petPos.x += (target.x - petPos.x) * CGFloat(min(1, dt * 7))
+        petPos.y += (target.y - petPos.y) * CGFloat(min(1, dt * 7))
+        petNode.position = petPos
+        petNode.xScale = player.xScale < 0 ? -1 : 1
+        bubbleNode?.position = ppos
+        petT -= dt
+        guard petT <= 0 else { return }
+        petT = pet.cooldown(petLevel)
+        switch pet {
+        case .pip:
+            let r = Pet.fetchRange(petLevel)
+            var fetched = 0
+            for i in pickups.indices where !pickups[i].pulled && dist2(pickups[i].pos, ppos) < r * r { pickups[i].pulled = true; fetched += 1 }
+            if fetched > 0 {
+                let ring = ringSprite(at: ppos, radius: r, color: UIColor(red: 0.7, green: 1, blue: 0.4, alpha: 0.6))
+                ring.setScale(1)
+                addFX(ring, life: [.group([.scale(to: 0.2, duration: 0.35), .fadeOut(withDuration: 0.35)])])
+            }
+        case .bloop:
+            guard !bubbleUp else { return }
+            bubbleUp = true
+            let b = ringSprite(at: ppos, radius: 46, color: UIColor(red: 0.6, green: 0.9, blue: 1, alpha: 0.8), filled: true)
+            b.zPosition = 6; b.setScale(0.2)
+            world.addChild(b); bubbleNode = b
+            b.run(.scale(to: 1, duration: 0.25))
+        case .zip:
+            guard let t = nearest(to: petPos, within: 360) else { petT = 0.3; return }
+            let dir = norm(sub(t.pos, petPos))
+            let n = SKSpriteNode(texture: tex("bolt")); n.size = CGSize(width: 24, height: 10)
+            n.color = UIColor(red: 1, green: 0.9, blue: 0.3, alpha: 1); n.colorBlendFactor = 0.9
+            n.zRotation = CGFloat(atan2(dir.dy, dir.dx)); n.position = petPos; shotLayer.addChild(n)
+            bolts.append(Bolt(pos: petPos, vel: CGVector(dx: dir.dx * 620, dy: dir.dy * 620), damage: Pet.sparkDamage(petLevel) * stats.damage, pierce: 0, life: 0.8, node: n))
+        }
+    }
+
+    private func setupGhost() {
+        guard ghost != nil else { return }
+        ghostNode.texture = tex(skin.texture(.happy))
+        ghostNode.size = CGSize(width: 64, height: 64); ghostNode.zPosition = 4.5
+        ghostNode.alpha = 0.32; ghostNode.color = UIColor(red: 0.6, green: 0.85, blue: 1, alpha: 1); ghostNode.colorBlendFactor = 0.6
+        let tag = SKLabelNode(fontNamed: "AvenirNext-Heavy"); tag.text = "BEST RUN"; tag.fontSize = 11
+        tag.fontColor = UIColor(white: 1, alpha: 0.9); tag.position = CGPoint(x: 0, y: 40)
+        ghostNode.addChild(tag)
+        world.addChild(ghostNode)
+    }
+
+    private func updateGhost(_ dt: Double) {
+        // Record this run for a future ghost.
+        if !state.organ.isSideMode, !bossDefeated {
+            recT -= dt
+            if recT <= 0 { recT += Ghost.interval; recXs.append(Float(ppos.x)); recYs.append(Float(ppos.y)) }
+        }
+        guard let ghost, !ghostGone else { return }
+        if let p = ghost.position(at: time) {
+            ghostNode.position = CGPoint(x: p.x, y: p.y)
+        } else {
+            ghostGone = true
+            ghostNode.run(.sequence([.fadeOut(withDuration: 0.5), .removeFromParent()]))
+            if !bossDefeated { state.flash("👻 Your best run cleared here at \(timeString(ghost.time))", seconds: 2) }
+        }
+    }
+
+    /// This run as a ghost (nil for side modes).
+    var recordedGhost: Ghost? {
+        state.organ.isSideMode || recXs.isEmpty ? nil : Ghost(time: time, xs: recXs, ys: recYs)
+    }
+
+    /// The boss on screen when Nano went down (it becomes the Nemesis).
+    var defeatedBy: BossSetup? {
+        guard let b = boss, b.alive, b !== nemesisEnemy else { return nil }
+        return BossSetup(kind: b.kind, variant: b.variant)
+    }
+
+    private func updateNemesis() {
+        guard let nemesis, !nemesisSpawned, !bossDefeated, time >= Nemesis.arrival else { return }
+        nemesisSpawned = true
+        let setup = nemesis.setup
+        let a = Double.random(in: 0..<(2 * .pi))
+        let e = spawn(setup.kind, at: CGPoint(x: ppos.x + cos(a) * 300, y: ppos.y + sin(a) * 300),
+                      hpMul: setup.variant.hpScale * nemesis.hpScale, sizeMul: setup.variant.sizeScale)
+        e.variant = setup.variant; e.title = "Nemesis " + setup.title; e.speed *= setup.variant.speedScale
+        e.node.texture = tex(setup.texture)
+        if let t = setup.variant.tint { e.baseTint = UIColor(red: t.r, green: t.g, blue: t.b, alpha: 1); e.baseBlend = 0; restoreTint(e) }
+        e.timerA = 3; e.timerB = 5
+        nemesisEnemy = e
+        seen.insert(setup.texture)
+        Sound.warning.play(); Haptics.medium(); shake = 0.5
+        state.flash("😈 NEMESIS: \(setup.title.uppercased())\n\"Remember me, Nano?\"", seconds: 3)
     }
 
     private func setupMode() {

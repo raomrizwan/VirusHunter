@@ -563,6 +563,54 @@ def ally(name, size=256):
     return wrap("".join(p), size, size, defs)
 
 
+def pet(name, size=256):
+    """Nano's pets: tiny friendly helpers that level up over many runs."""
+    c = size / 2
+    p = []
+    def face(cx, cy, r, ink="#1A1A3A"):
+        out = ""
+        for sx in (-1, 1):
+            out += f'<ellipse cx="{cx+sx*r*0.36}" cy="{cy}" rx="{r*0.15}" ry="{r*0.19}" fill="{ink}"/><circle cx="{cx+sx*r*0.36-r*0.05}" cy="{cy-r*0.07}" r="{r*0.06}" fill="#fff"/>'
+            out += f'<ellipse cx="{cx+sx*r*0.6}" cy="{cy+r*0.22}" rx="{r*0.12}" ry="{r*0.07}" fill="#FF8AA8" opacity=".7"/>'
+        out += f'<path d="M{cx-r*0.18} {cy+r*0.26} Q{cx} {cy+r*0.44} {cx+r*0.18} {cy+r*0.26}" stroke="{ink}" stroke-width="{r*0.06}" fill="none" stroke-linecap="round"/>'
+        return out
+    if name == "pip":
+        # Probiotic pup: a capsule-shaped good bacterium with floppy ears and a wagging tail
+        defs = '<linearGradient id="pp" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#E6FF8A"/><stop offset="1" stop-color="#6FD34A"/></linearGradient>'
+        p.append(f'<ellipse cx="{c}" cy="{c+size*0.3}" rx="{size*0.3}" ry="{size*0.05}" fill="#000" opacity=".2"/>')
+        p.append(f'<path d="M{c+size*0.3} {c+size*0.05} Q{c+size*0.46} {c-size*0.05} {c+size*0.42} {c-size*0.2}" stroke="#6FD34A" stroke-width="{size*0.06}" fill="none" stroke-linecap="round"/>')
+        p.append(f'<rect x="{c-size*0.34}" y="{c-size*0.2}" width="{size*0.68}" height="{size*0.44}" rx="{size*0.22}" fill="url(#pp)" stroke="#3E8A2A" stroke-width="{size*0.02}"/>')
+        for sx in (-1, 1):
+            p.append(f'<path d="M{c+sx*size*0.12} {c-size*0.18} Q{c+sx*size*0.32} {c-size*0.36} {c+sx*size*0.3} {c-size*0.06} Z" fill="#B8E05A" stroke="#3E8A2A" stroke-width="{size*0.016}"/>')
+        for i in range(5):
+            x = c - size * 0.22 + i * size * 0.11
+            p.append(f'<circle cx="{x}" cy="{c+size*0.16}" r="{size*0.018}" fill="#3E8A2A" opacity=".35"/>')
+        p.append(face(c, c - size * 0.01, size * 0.24))
+        p.append(f'<ellipse cx="{c}" cy="{c+size*0.05}" rx="{size*0.04}" ry="{size*0.03}" fill="#1A1A3A"/>')
+    elif name == "bloop":
+        # Platelet puff: a soft pink disc that blows protective bubbles
+        defs = '<radialGradient id="bp" cx="40%" cy="30%" r="80%"><stop offset="0" stop-color="#FFD6E2"/><stop offset=".6" stop-color="#FF7FA6"/><stop offset="1" stop-color="#D9416E"/></radialGradient>'
+        p.append(f'<ellipse cx="{c}" cy="{c+size*0.3}" rx="{size*0.28}" ry="{size*0.05}" fill="#000" opacity=".2"/>')
+        p.append(f'<ellipse cx="{c}" cy="{c+size*0.04}" rx="{size*0.36}" ry="{size*0.26}" fill="url(#bp)" stroke="#A82A55" stroke-width="{size*0.02}"/>')
+        p.append(f'<ellipse cx="{c}" cy="{c+size*0.08}" rx="{size*0.2}" ry="{size*0.1}" fill="#D9416E" opacity=".25"/>')
+        p.append(face(c, c - size * 0.0, size * 0.25))
+        for (x, y, r) in [(0.28, -0.3, 0.09), (0.4, -0.42, 0.05), (0.18, -0.44, 0.035)]:
+            p.append(f'<circle cx="{c+size*x}" cy="{c+size*y}" r="{size*r}" fill="#BFF4FF" fill-opacity=".35" stroke="#7FE0FF" stroke-width="{size*0.012}"/>')
+            p.append(f'<circle cx="{c+size*x-size*r*0.35}" cy="{c+size*y-size*r*0.35}" r="{size*r*0.25}" fill="#fff"/>')
+    else:
+        # Spark bug: a round yellow bug with lightning antennae and buzzing wings
+        defs = '<radialGradient id="zp" cx="40%" cy="30%" r="80%"><stop offset="0" stop-color="#FFFBD0"/><stop offset=".6" stop-color="#FFD83A"/><stop offset="1" stop-color="#E09A10"/></radialGradient>'
+        p.append(f'<ellipse cx="{c}" cy="{c+size*0.32}" rx="{size*0.24}" ry="{size*0.05}" fill="#000" opacity=".2"/>')
+        for sx in (-1, 1):
+            p.append(f'<ellipse cx="{c+sx*size*0.27}" cy="{c-size*0.14}" rx="{size*0.16}" ry="{size*0.1}" transform="rotate({sx*-25} {c+sx*size*0.27} {c-size*0.14})" fill="#CFF6FF" fill-opacity=".55" stroke="#7FD8FF" stroke-width="{size*0.012}"/>')
+            x0 = c + sx * size * 0.1
+            p.append(f'<path d="M{x0} {c-size*0.2} L{x0+sx*size*0.04} {c-size*0.3} L{x0-sx*size*0.01} {c-size*0.31} L{x0+sx*size*0.07} {c-size*0.43}" stroke="#FFD83A" stroke-width="{size*0.025}" fill="none" stroke-linejoin="round" stroke-linecap="round"/>')
+        p.append(f'<circle cx="{c}" cy="{c+size*0.05}" r="{size*0.26}" fill="url(#zp)" stroke="#A86A00" stroke-width="{size*0.02}"/>')
+        p.append(f'<path d="M{c-size*0.22} {c+size*0.16} Q{c} {c+size*0.24} {c+size*0.22} {c+size*0.16}" stroke="#A86A00" stroke-width="{size*0.02}" fill="none" opacity=".6"/>')
+        p.append(face(c, c + size * 0.02, size * 0.24))
+    return wrap("".join(p), size, size, defs)
+
+
 def bed(size=256):
     """Patient Zero's hospital bed for Hospital Defense (seen from above)."""
     c = size / 2
@@ -890,6 +938,8 @@ if __name__ == "__main__":
         items.append((f"villain-{v}", villain(v)))
     for a in ["medic", "guardian", "hunter"]:
         items.append((f"ally-{a}", ally(a)))
+    for k in ["pip", "bloop", "zip"]:
+        items.append((f"pet-{k}", pet(k)))
     items.append(("bed", bed()))
     items += [("orb", orb()), ("orb-big", orb(96, "#FFE45C", "#FFFFE0")), ("coin", coin()), ("heart", heart()), ("chest", chest()),
               ("glow", glow()), ("glow-pink", glow(128, "#FF6BD5")), ("glow-gold", glow(128, "#FFE45C")), ("bolt", bolt()), ("bomb", bomb()), ("slime", slime())]

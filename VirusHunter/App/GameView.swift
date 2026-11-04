@@ -111,6 +111,17 @@ struct GameContent: View {
         s.seasonXP += Season.runXP(kills: r.kills, bosses: r.bosses, seconds: r.time, won: won)
         let newTiers = s.seasonTier - tierBefore
         let alertPaid = won && s.claimAlert(organ, alert: before.outbreakAlert())
+        // Pet XP, Nemesis and ghost
+        let runXP = Season.runXP(kills: r.kills, bosses: r.bosses, seconds: r.time, won: won)
+        let petUp = s.feedPet(runXP)
+        let avenged = holder.scene.nemesisBeaten && s.nemesis != nil
+        if avenged { s.avengeNemesis() }
+        var newNemesis: String?
+        if !won, let by = holder.scene.defeatedBy, s.nemesis == nil || s.nemesis?.kind == by.kind.rawValue {
+            s.recordDefeat(by: by, in: organ)
+            if s.nemesis != nil { newNemesis = by.title }
+        }
+        let newGhost = won && holder.scene.recordedGhost.map { GhostStore.offer($0, key: GhostStore.key(country: s.country.id, organ: organ.id)) } == true
         var rushLine: String?
         if organ.isBossRush, won {
             let week = BossRush.week()
@@ -133,6 +144,10 @@ struct GameContent: View {
         if dna > 0 { unlocks.append("🧬 +\(dna) Boss DNA for the Craft Lab") }
         if alertPaid { unlocks.insert("🚨 Outbreak Alert contained! +\(OutbreakAlert.coinBonus) coins, +\(OutbreakAlert.dnaBonus) Boss DNA", at: 0) }
         if newTiers > 0 { unlocks.append("🎟️ Season Pass tier \(s.seasonTier) reached") }
+        if avenged { unlocks.insert("😈 Nemesis defeated! +\(Nemesis.revengeCoins) coins, +\(Nemesis.revengeDNA) Boss DNA", at: 0) }
+        if let newNemesis { unlocks.append("😈 \(newNemesis) is now your Nemesis. It will hunt you in the next city") }
+        if let petUp, let p = s.pet { unlocks.append("🐾 \(p.title) reached level \(petUp)") }
+        if newGhost { unlocks.append("👻 New best run! Your ghost will race you next time") }
         if !newCards.isEmpty { unlocks.append("📖 \(newCards.count) new Virus-pedia card\(newCards.count == 1 ? "" : "s") (+\(newCards.count * Pedia.coinsPerCard) coins)") }
         if s.citiesCleared >= 1, before.citiesCleared == 0 { unlocks.append("Medic Cell ally and Boss Rush unlocked") }
         reward = (coins, false)

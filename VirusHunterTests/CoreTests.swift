@@ -363,6 +363,57 @@ final class CoreTests: XCTestCase {
         XCTAssertEqual(back.labBoost, 3)
     }
 
+    func testPetsLevelUpAndAdopt() {
+        var s = SaveData()
+        XCTAssertEqual(s.pet, .pip)
+        XCTAssertEqual(s.petLevel(.pip), 1)
+        XCTAssertNil(s.feedPet(100))
+        XCTAssertEqual(s.feedPet(60), 2)
+        s.petXP["pip"] = 99_999
+        XCTAssertEqual(s.petLevel(.pip), Pet.maxLevel)
+        XCTAssertFalse(s.adoptPet(.zip))
+        s.coins = Pet.zip.price
+        XCTAssertTrue(s.adoptPet(.zip))
+        XCTAssertEqual(s.coins, 0)
+        XCTAssertEqual(s.pet, .zip)
+        XCTAssertLessThan(Pet.zip.cooldown(10), Pet.zip.cooldown(1))
+        XCTAssertGreaterThan(Pet.sparkDamage(10), Pet.sparkDamage(1))
+        let back = try! JSONDecoder().decode(SaveData.self, from: JSONEncoder().encode(s))
+        XCTAssertEqual(back.pet, .zip)
+        XCTAssertEqual(back.petXP["pip"], 99_999)
+    }
+
+    func testNemesisHuntsLaterCitiesOnly() {
+        var s = SaveData(); s.countryCode = "PK"
+        let lungs2 = Organ.all[0].at(infection: 2)
+        let setup = BossSetup(kind: .bossCowboy, variant: .toxic)
+        s.recordDefeat(by: setup, in: lungs2)
+        XCTAssertEqual(s.nemesis?.setup, setup)
+        XCTAssertFalse(s.nemesisHunts(lungs2))
+        XCTAssertTrue(s.nemesisHunts(Organ.all[2].at(infection: 3)))
+        XCTAssertFalse(s.nemesisHunts(.endless))
+        s.recordDefeat(by: setup, in: lungs2)
+        XCTAssertEqual(s.nemesis?.wins, 2)
+        XCTAssertGreaterThan(s.nemesis!.hpScale, 1.2)
+        s.recordDefeat(by: BossSetup(kind: .bossSumo, variant: .normal), in: lungs2)
+        XCTAssertEqual(s.nemesis?.kind, "bossCowboy")
+        s.switchCountry(to: "IN")
+        XCTAssertFalse(s.nemesisHunts(Organ.all[2].at(infection: 3)))
+        s.switchCountry(to: "PK")
+        let coins = s.coins
+        s.avengeNemesis()
+        XCTAssertNil(s.nemesis)
+        XCTAssertEqual(s.coins, coins + Nemesis.revengeCoins)
+    }
+
+    func testGhostPositionsInterpolate() {
+        let g = Ghost(time: 1, xs: [0, 10, 20, 30, 40], ys: [0, 0, 0, 0, 0])
+        XCTAssertEqual(g.position(at: 0)!.x, 0, accuracy: 0.001)
+        XCTAssertEqual(g.position(at: 0.125)!.x, 5, accuracy: 0.001)
+        XCTAssertEqual(g.position(at: 1)!.x, 40, accuracy: 0.001)
+        XCTAssertNil(g.position(at: 1.1))
+    }
+
     func testFirstCityKeepsClassicBosses() {
         for o in Organ.all {
             let b = o.bossSetup(country: "PK")

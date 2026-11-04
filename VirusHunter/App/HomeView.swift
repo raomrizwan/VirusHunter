@@ -45,7 +45,7 @@ struct HomeView: View {
                         .accessibilityIdentifier("bossRushButton")
                     tile("Pedia", "book.fill", Theme.cyan, sub: "\(s.discovered.intersection(Pedia.ids).count)/\(Pedia.all.count)", badge: nil) { model.go(.pedia) }
                         .accessibilityIdentifier("pediaButton")
-                    tile("Allies", "person.2.fill", Theme.lime, sub: s.ally?.title ?? "Pick one", badge: nil) { model.go(.allies) }
+                    tile("Team", "pawprint.fill", Theme.lime, sub: s.pet.map { "\($0.title.components(separatedBy: " ").first ?? "") Lv \(s.petLevel($0))" } ?? "Allies & pets", badge: nil) { model.go(.allies) }
                         .accessibilityIdentifier("alliesButton")
                     tile("Skins", "paintpalette.fill", Theme.gold, sub: s.skin.title, badge: s.canAffordNewSkin ? "!" : nil) { model.go(.skins) }
                         .accessibilityIdentifier("skinsButton")
@@ -122,6 +122,10 @@ struct HomeView: View {
             }
             .buttonStyle(PressStyle())
             .offset(y: float ? -8 : 6)
+            if let p = s.pet {
+                Image(p.texture).resizable().scaledToFit().frame(width: 46)
+                    .offset(x: 100, y: float ? 62 : 54)
+            }
             if let a = s.ally {
                 Image(a.texture).resizable().scaledToFit().frame(width: 58)
                     .offset(x: -110, y: float ? 40 : 52)

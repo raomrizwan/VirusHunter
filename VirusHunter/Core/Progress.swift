@@ -92,6 +92,10 @@ struct SaveData: Codable, Equatable {
     var seasonClaimed = 0                       // highest season tier paid out
     var alertClaimedDay = ""                    // day the Outbreak Alert bonus was paid
     var labBoost = 0                            // Vaccine Lab stars for the next run (0...3)
+    var ownedPets: Set<String> = []
+    var petID: String? = "pip"                  // active pet (Pip is free)
+    var petXP: [String: Int] = [:]
+    var nemesis: Nemesis?                       // the boss that last beat Nano
 
     func level(_ t: TechKind) -> Int { tech[t.rawValue] ?? 0 }
     func rank(_ t: TechKind) -> Int { ranks[t.rawValue] ?? 0 }
@@ -208,6 +212,10 @@ extension SaveData {
         seasonClaimed = try c.decodeIfPresent(Int.self, forKey: .seasonClaimed) ?? d.seasonClaimed
         alertClaimedDay = try c.decodeIfPresent(String.self, forKey: .alertClaimedDay) ?? d.alertClaimedDay
         labBoost = try c.decodeIfPresent(Int.self, forKey: .labBoost) ?? d.labBoost
+        ownedPets = try c.decodeIfPresent(Set<String>.self, forKey: .ownedPets) ?? d.ownedPets
+        petID = try c.decodeIfPresent(String.self, forKey: .petID) ?? d.petID
+        petXP = try c.decodeIfPresent([String: Int].self, forKey: .petXP) ?? d.petXP
+        nemesis = try c.decodeIfPresent(Nemesis.self, forKey: .nemesis)
         bestCities = max(bestCities, citiesCleared)
     }
 }

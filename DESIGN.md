@@ -166,3 +166,28 @@ the mission card on Home. Beating it that day pays +500 coins and +2 Boss DNA on
 After a campaign win the result screen shows a timing game: tap MIX while the needle is in the
 green zone, three tries with a smaller zone each time. Each hit is a star; each star gives the next
 run +8% damage and +10 max health. The boost is used up when that run starts.
+
+## Pets
+
+A pet flies with Nano in every run (Team screen, under the allies). Pets earn the same XP as the
+Season Pass from every run and level 1 to 10 (150 / 400 / 750 / ... / 5,000 total XP).
+
+| Pet | Price | Ability (gets better with level) |
+|---|---|---|
+| Pip the Probiotic | free | Fetches every pickup within 270 to 540 points, every 7 to 3.5 s |
+| Bloop the Platelet | 3,000 | A bubble that blocks the next hit, every 22.6 to 10 s |
+| Zip the Spark Bug | 5,000 | Sparks at the nearest virus (11 to 43 damage), every 1.5 to 0.7 s |
+
+## Nemesis
+
+When Nano goes down while a boss is on screen, that boss (with its variant) becomes the Nemesis.
+It does not replace any city's own boss: in any later city of the same country it shows up as an
+extra fight 2:30 into the run ("Remember me, Nano?") with 20% more health, +15% for every further
+win over Nano. Beating it pays +400 coins and +3 Boss DNA and clears it. One Nemesis at a time.
+
+## Ghost run
+
+Every campaign clear is recorded (Nano's position 4 times a second). The fastest clear of each
+organ per country is kept as a ghost: a see-through Nano marked BEST RUN that replays that route
+in the next runs of the organ, and leaves with "Your best run cleared here at m:ss".
+Friends' ghosts would need a server and are not part of this version.
