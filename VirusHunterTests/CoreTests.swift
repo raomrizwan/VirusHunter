@@ -31,6 +31,11 @@ final class CoreTests: XCTestCase {
         for w in [WeaponKind.laser, .swarm, .shield, .field] { l.apply(.weapon(w, toLevel: 5)) }
         for p in PassiveKind.allCases { l.apply(.passive(p, toLevel: 5)) }
         var rng = SystemRandomNumberGenerator()
+        // Maxed weapons with their partner passive offer evolutions first...
+        XCTAssertEqual(Set(l.candidates()), Set([WeaponKind.laser, .swarm, .shield, .field].map { UpgradeOption.weapon($0, toLevel: evolvedLevel) }))
+        // ...and once everything is evolved, only the fallbacks remain.
+        for w in [WeaponKind.laser, .swarm, .shield, .field] { l.apply(.weapon(w, toLevel: evolvedLevel)) }
+        XCTAssertTrue(l.candidates().isEmpty)
         let o = l.rollOptions(rng: &rng)
         XCTAssertEqual(o.count, 3)
         XCTAssertTrue(o.contains(.heal))
