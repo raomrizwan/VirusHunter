@@ -70,6 +70,7 @@ struct SaveData: Codable, Equatable {
     var seenStory: Set<String> = []             // story scene ids already shown
     var countryCode: String?                    // chosen outbreak country (nil = not asked yet)
     var daily = DailyState()                    // daily missions + login streak
+    var everEvolved = false                     // evolved a weapon at least once (achievement)
 
     func level(_ t: TechKind) -> Int { tech[t.rawValue] ?? 0 }
     func rank(_ t: TechKind) -> Int { ranks[t.rawValue] ?? 0 }
@@ -134,6 +135,7 @@ extension SaveData {
         seenStory = try c.decodeIfPresent(Set<String>.self, forKey: .seenStory) ?? d.seenStory
         countryCode = try c.decodeIfPresent(String.self, forKey: .countryCode)
         daily = try c.decodeIfPresent(DailyState.self, forKey: .daily) ?? d.daily
+        everEvolved = try c.decodeIfPresent(Bool.self, forKey: .everEvolved) ?? d.everEvolved
     }
 }
 

@@ -28,6 +28,7 @@ struct HomeView: View {
                     .buttonStyle(PressStyle())
                     .accessibilityIdentifier("dailyButton")
                     Spacer()
+                    toggle("trophy.fill") { GameCenter.showDashboard() }.accessibilityIdentifier("gameCenterButton")
                     toggle(sound ? "speaker.wave.2.fill" : "speaker.slash.fill") { sound.toggle() }.accessibilityIdentifier("soundToggle")
                     toggle(haptics ? "iphone.radiowaves.left.and.right" : "iphone.slash") { haptics.toggle() }
                 }

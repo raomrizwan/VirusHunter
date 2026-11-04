@@ -80,6 +80,11 @@ Three missions a day (seeded by date: one easy, one medium, one hard, different 
 plus a 500-coin chest for all three. Login streak pays 100/150/200/300/400/500/1000 for days 1-7 (missing a day resets).
 Home has a "Daily" button with a badge for unclaimed rewards.
 
+## Game Center (`App/GameCenter.swift`)
+Silent sign-in on launch; trophy button on Home opens the dashboard. Leaderboards: `vh.leaderboard.endless` (best Endless seconds),
+`vh.leaderboard.cities` (cities saved), `vh.leaderboard.kills` (total kills). Achievements: `vh.ach.first_boss`, `first_city`,
+`five_cities`, `country_saved`, `evolved`, `streak7`, `endless10` (10 min Endless), `kills10k`. These IDs must exist in App Store Connect.
+
 ## Meta — Tech Lab (Bio-Coins)
 Permanent upgrades: Power, Armor (−dmg), Max HP, Speed, Magnet, Coin bonus, Revive (one free).
 Each 10 levels, rising cost. After MAX, **Mutation Ranks** (up to 50 per tech, not Revive): each rank is worth 0.4 of a level

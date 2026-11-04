@@ -148,6 +148,7 @@ struct DailyView: View {
         guard let coins = action(&s) else { Haptics.error(); return }
         model.save = s
         model.persist()
+        GameCenter.sync(s)
         Sound.coin.play(); Haptics.success()
         withAnimation(.spring(duration: 0.4, bounce: 0.5)) { flash = "+\(coins)" }
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.1) { withAnimation { flash = nil } }

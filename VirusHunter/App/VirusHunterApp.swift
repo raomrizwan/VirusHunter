@@ -127,6 +127,7 @@ struct RootView: View {
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in model.refreshDaily() }
         .onAppear {
             Sound.preload()
+            GameCenter.authenticate()
             if !AppModel.uiTesting { AdService.start() }
         }
     }

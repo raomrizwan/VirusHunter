@@ -92,11 +92,13 @@ struct GameContent: View {
         if won { s.recordClear(organ) }
         let scene = won ? Story.afterWin(organ, before: model.save, after: s) : nil
         if organ.isEndless { s.bestEndless = max(s.bestEndless, r.time) }
+        if holder.state.loadout.weapons.values.contains(where: { $0 >= evolvedLevel }) { s.everEvolved = true }
         s.daily.refresh()
         s.daily.record(RunReport(kills: r.kills, bosses: r.bosses, cleared: won && !organ.isEndless, seconds: r.time,
                                  coins: r.coins, level: r.level, endless: organ.isEndless))
         model.save = s
         model.persist()
+        GameCenter.sync(s)
         unlocks = newUnlocks(before: before, after: s)
         reward = (coins, false)
         if let scene { DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { model.showStory(scene) } }
